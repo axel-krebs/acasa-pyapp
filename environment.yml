@@ -1,0 +1,5 @@
+name: acasa-proto
+dependencies:
+  - yaml
+  - reportlab
+  - wxpython

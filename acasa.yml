@@ -1,0 +1,37 @@
+version: 1
+license_key: "li87Dd96Dh8zG/(c7g7)CGs70hihhhi/GkBfubumö"
+billing:
+    currency: "€"
+repertoire: {
+    "Pizzas": [
+        {"id": 100, "name": "Pizza Margaritha", "price": 5.0}, 
+        {"id": 101, "name": "Pizza Thunfisch", "price": 6.0}, 
+        {"id": 102, "name": "Pizza Funghi", "price": 7.0},
+    ],
+    "Aufläufe": [
+        {"id": 200, "name": "Auflauf Nudeln", "price": 7.0}, 
+        {"id": 201, "name": "Auflauf Kartoffeln", "price": 6.0}, 
+    ],
+    "Getränke": [
+        {"id": 300, "name": "Pepsi Cola", "price": 2.50}, 
+        {"id": 301, "name": "Fritz! Cola", "price": 3.50}, 
+     ],
+    "Deserts": [
+        {"id": 555, "name": "Tiramisu", "price": 6.66}, 
+    ]}
+messages: {
+    "EN": {
+        "what_to_order": "What do want to order? Enter a number from above.",
+        "msr": "pcs.",
+        "how_many": "How many?",
+        "unrecognized_input": "Leider haben wir keinen Übersetzer gefunden, der diese Anweisung überesetzen kann.."
+    },
+    "DE": {
+        "what_to_order": "Was möchten Sie bestellen? (Nummer s. oben). Geben Sie 0 ein, wenn Sie die Bestellung abschließen wollen.",
+        "msr": "Stück",
+        "how_many": "Wie viele?",
+        "unrecognized_input": "{} bieten wir leider nicht an.. Wollen Sie weiter bestellen ('w') oder haben Sie fertig (ENTER)?\n>"
+    }
+}
+output_management:
+    output_file_directory: "out"

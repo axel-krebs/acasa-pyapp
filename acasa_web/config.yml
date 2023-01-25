@@ -1,0 +1,6 @@
+version: 1
+database:
+  file_name: "portal.db3"
+web:
+  routes:
+    
