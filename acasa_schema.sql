@@ -8,14 +8,14 @@ CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     price REAL,
-    category INTEGER,
-    FOREIGN KEY (category) REFERENCES categories(id)
+    category_id INTEGER,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
 );
 CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
-    password TEXT NULL
+    pass_word TEXT NULL
 );
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

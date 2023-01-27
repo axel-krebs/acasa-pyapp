@@ -4,6 +4,7 @@ import yaml
 import os
 import errors as ERR
 from pathlib import Path
+import csv
 from license_management import *
 from acasa_backoffice.output_management import *
 from order_management import *
@@ -56,24 +57,72 @@ def load_db_schema() -> list:
                 current_str += line.strip("\n") # remove Zeilenumbruch          
     return statements
 
+def load_csv(file_path: Path, fn: list) -> list:
+    ret_list = []
+    with open(file_path,mode="r") as csv_file:
+        csv_reader = csv.DictReader(csv_file, fieldnames=fn, delimiter="|")
+        next(csv_reader) # skip headers
+        for line in csv_reader:
+            ret_list.append(line)
+    return ret_list
+
 def start_db_admin(db_controller):
     while True:
-        print("DB Admin. Pls. choose an available operation:")
+        print("You're in DB admin. Pls. choose from following operations:")
         print("\t0. Quit DB admin.")
         print("\t1. Initialize database (schema creation).")
-        print("\t2. Enter custom SQL.")
+        print("\t2. Load data from CSV.")
+        print("\t3. Enter custom SQL.")
         user_choice = input("\t>")
         if user_choice == '0':
             break
         elif user_choice == '1':
             sql_stmts = load_db_schema()
             for sql_stmt in sql_stmts:
-                res = db_controller.execute_sql(sql_stmt)
-                print("SQL executed: {}, result is: {}".format(sql_stmt, res))
+                res_code = db_controller.execute_sql(sql_stmt)
+                print("SQL executed: {}, result is: {}".format(sql_stmt, res_code))
         elif user_choice == '2':
+            print("Loading files.. ")
+            csv_files = [
+                ("categories",["ID","NAME"]),
+                ("products",["ID","NAME","PRICE","CATEGORY_ID"]),
+                ("customers",["ID","NAME","E_MAIL","PASS_WORD"])
+            ]
+            for file_def in csv_files:
+                entity_name = file_def[0]
+                cols = file_def[1]
+                csv_file_path = "{}{}{}.csv".format(SCRIPT_PATH.resolve(), os.sep, entity_name)
+                res_csv = load_csv(csv_file_path, cols)
+
+                # convert to SQL string; TODO move this code to a mapping facade object!
+                for data_set in res_csv:
+                    keys = []
+                    values = []
+                    for attr_key in data_set: # remember keys and values sperately for later
+                        keys.append(str(attr_key).lower())
+                        values.append(data_set[attr_key]) 
+                    sql = "INSERT INTO " + entity_name + "("
+                    sql += ",".join(keys)
+                    sql += ") VALUES("
+                    sql += ",".join(values)
+                    sql += ") ON CONFLICT (id) DO UPDATE SET "
+                    cnt = 0 # needed for comma!
+                    while cnt < len(keys):
+                        cur_key = keys[cnt]
+                        if str(cur_key).upper() != "ID": # omit "id" field
+                            sql += " " + str(cur_key).lower() + "=" + "excluded." + str(cur_key).lower()
+                            if cnt < len(keys) - 1:
+                                sql += ","
+                        cnt += 1
+                    sql += ";"
+                    # send to controller
+                    sql_code = db_controller.execute_sql(sql)
+                    print("SQL returned: ", sql_code)
+        elif user_choice == '3':
             custom_sql = input("SQL>")
-            res = db_controller.execute_sql(custom_sql)
-            print("SQL executed: {}, result is: {}".format(custom_sql, res))
+            res_csv = db_controller.execute_sql(custom_sql)
+            print("SQL executed: {}, result is: {}".format(custom_sql, res_csv))
+
 def main():
     config = load_config()
     admin_language = "EN"
