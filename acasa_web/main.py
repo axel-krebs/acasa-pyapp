@@ -20,12 +20,31 @@ with open(CONFIG_PATH, mode = "r", encoding = "UTF-8") as openfile:
 # Things don't get started here.. Goal is to initialize properly!
 # modularized because of invocation from __init__.py, s.th.
 def _init_controls(web_mod,db_mod): 
+    global db_proxy, web_ctl
+    init_seq = 0
     web_ctl = web_mod.WebController(config)
     db_name = config['database']['file_name']
     db_path = os.path.join(os.path.dirname(__file__), db_name)
     db_proxy = db_mod.create_proxy(db_path)
     web_ctl.create_routes(db_proxy)
-    return web_ctl, db_proxy
+    return init_seq
+
+######################################################
+# Accessors provided via module import
+######################################################
+
+def get_web_controller():
+    return web_ctl 
+
+def get_db_proxy():
+    return db_proxy
+
+###############################################################################
+# Utility methods
+###############################################################################
+
+def create_db_schema():
+    pass
 
 ################################################################################
 # Executed when this script gets loaded.. (compare __init__.py in this folder!)

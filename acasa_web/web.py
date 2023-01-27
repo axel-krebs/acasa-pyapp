@@ -1,4 +1,7 @@
-# ACASA web 
+""" ACASA web.
+    ----------
+    - Asyncronous request handling with Quart (ASGI server)
+"""
 from quart import Quart, render_template
 
 class WebController(): # 'wrapper' around Quart
@@ -18,7 +21,7 @@ class WebController(): # 'wrapper' around Quart
 
         @self._quart.route('/products/')
         async def list_products():
-            ps = db_facade.get_products()
+            #prods = db_facade.get_products()
             return 'products'
 
         # TODO change route definition -> mapping JSON requests to database calls
