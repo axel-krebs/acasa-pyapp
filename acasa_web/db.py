@@ -60,10 +60,29 @@ class DbInstance:
                 return SQLCode("SUCCESS")
             except sqlite3.DatabaseError as sql_ex:
                 return SQLCode(sql_ex)
-
-    # Execute multiple statements and commit after last one or rollback.
-    def execute_bulk(self, statements: list) -> SQLCode:
-        pass
+    
+    # 'Facade' method: Creates SQL 'INSERT .. ON CONFLICT (..) DO UPDATE"
+    def upsert(self, table: str, data_set: dict, key_field: str = "ID") -> SQLCode:
+        keys = []
+        values = []
+        for attr_key in data_set: # remember keys and values sperately for later
+            keys.append(str(attr_key).lower())
+            values.append(data_set[attr_key]) 
+        sql = "INSERT INTO " + table + "("
+        sql += ",".join(keys)
+        sql += ") VALUES("
+        sql += ",".join(values)
+        sql += ") ON CONFLICT (id) DO UPDATE SET "
+        cnt = 0 # needed for comma!
+        while cnt < len(keys):
+            cur_key = keys[cnt]
+            if str(cur_key) != key_field: # omit "id" field for UPSERT
+                sql += " " + str(cur_key).lower() + "=" + "excluded." + str(cur_key).lower()
+                if cnt < len(keys) - 1:
+                    sql += ","
+            cnt += 1
+        sql += ";"
+        return self.execute_sql(sql)
 
     def query_db(self, sql_query) -> list:
         conn = sqlite3.connect(self._db_file_path)
