@@ -2,5 +2,13 @@ version: 1
 database:
   file_name: "portal.db3"
 web:
-  routes:
-    
+  import_name: "acasa-customer-portal"
+  static_folder: "static"
+  static_url_path: "/"
+  static_host: "localhost"
+  template_folder: "templates"
+  root_path: "./"
+  instance_path: ""
+  host_matching: False
+  subdomain_matching: False
+  instance_relative_config: False
