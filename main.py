@@ -1,4 +1,4 @@
-# Restaurant ACASA
+# Restaurant ACASA client utitlities
 import test
 import yaml
 import os
@@ -13,7 +13,14 @@ from acasa_admin.admin_gup import start_admin_app
 os.chdir(Path(__file__).parent)
 
 SCRIPT_PATH = Path(__name__).parent.resolve()
-SQL_PATH = Path("{}{}acasa_schema.sql".format(SCRIPT_PATH,os.sep))
+
+# Metadata for CSV-import files: attributes must be in the given list!
+# Format: {table_name => [attribute1, attribute2, etc.]}
+CSV_FILES = [
+    ("categories",["ID","NAME"]),
+    ("products",["ID","NAME","PRICE","CATEGORY_ID"]),
+    ("customers",["ID","NAME","EMAIL","PASS_WORD"])
+]
 
 def load_config() -> dict:
     """ Load the menu from a YAML file.
@@ -31,7 +38,7 @@ def load_config() -> dict:
             raise ERR.LicenseError("Your license has probably expired.. :-)")
     return config
 
-# Depricated: to be replaced by customer portal
+# Depricated! TODO Introduce integration tests
 def start_order_management(config, lang):
     order = take_order(config, lang) # TODO pass language as program arg!
     print()
@@ -40,22 +47,6 @@ def start_order_management(config, lang):
     print (f"Vielen Dank für Ihre Bestellung über {sum_all} € und auf Wiedersehen!")
     # return anything?
     return order
-
-# The schema file must be splitted into a set of strings;
-# eventually move this to an SQL parsing utility (maybe db.py?)
-def load_db_schema() -> list:
-    statements = list()
-    with open(SQL_PATH, mode = "r", encoding = "UTF-8") as sql:
-        current_str = ""
-        for line in sql.readlines():
-            if line.startswith("--"): continue
-            elif line.rfind(";") > 0:
-                left_str, right_str = line.split(";")
-                statements.append(current_str + left_str) # no strip, line break is in right string
-                current_str = ""
-            else:
-                current_str += line.strip("\n") # remove Zeilenumbruch          
-    return statements
 
 def load_csv(file_path: Path, fn: list) -> list:
     ret_list = []
@@ -66,7 +57,7 @@ def load_csv(file_path: Path, fn: list) -> list:
             ret_list.append(line)
     return ret_list
 
-def start_db_admin(db_controller):
+def start_db_admin(main):
     while True:
         print("You're in DB admin. Pls. choose from following operations:")
         print("\t0. Quit DB admin.")
@@ -77,19 +68,11 @@ def start_db_admin(db_controller):
         if user_choice == '0':
             break
         elif user_choice == '1':
-            sql_stmts = load_db_schema()
-            for sql_stmt in sql_stmts:
-                res_code = db_controller.execute_sql(sql_stmt)
-                print("SQL executed: {}, result is: {}".format(sql_stmt, res_code))
+            main.init_db()     
         elif user_choice == '2':
             print("Loading files.. ")
-            # specify format of CSV file: attributes must be in given list!
-            csv_files = [
-                ("categories",["ID","NAME"]),
-                ("products",["ID","NAME","PRICE","CATEGORY_ID"]),
-                ("customers",["ID","NAME","EMAIL","PASS_WORD"])
-            ]
-            for file_def in csv_files:
+            db_controller = main.get_db_proxy() # get hold of DB controller (facade)
+            for file_def in CSV_FILES:
                 entity_name = file_def[0]
                 cols = file_def[1]
                 csv_file_path = "{}{}{}.csv".format(SCRIPT_PATH.resolve(), os.sep, entity_name)
@@ -106,7 +89,7 @@ def start_db_admin(db_controller):
             res_csv = db_controller.execute_sql(custom_sql)
             print("SQL executed: {}, result is: {}".format(custom_sql, res_csv))
 
-def main():
+def menu():
     config = load_config()
     admin_language = "EN"
     print("Acasa Restaurant Administration. ") # TODO logging
@@ -124,8 +107,7 @@ def main():
                 break
         elif user_choice == "1":
             from acasa_web import main # lazy loading allowed here..
-            db_facade = main.get_db_proxy()
-            start_db_admin(db_facade)
+            start_db_admin(main)
         elif user_choice == "2":
             from acasa_web import main # lazy loading allowed here..
             web_controller  = main.get_web_controller()
@@ -140,4 +122,4 @@ def main():
         else:
             print("You've entered an invalid choice.")
                 
-main()
+menu()

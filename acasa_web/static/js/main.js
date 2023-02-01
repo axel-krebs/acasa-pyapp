@@ -15,5 +15,5 @@ requirejs.config({
 requirejs(['jquery', 'canvas', 'app/sub'],
 function   ($,canvas,sub) {
     console.log('jQuery loaded..')
-
+    test_sub()
 });

@@ -12,6 +12,13 @@ class WebController(): # 'wrapper' around Quart
     def __init__(self, config: dict): # 'constructor'
         self._config = config
         self._quart = Quart(__name__)
+
+    def debug(self): 
+       self._quart.run()
+
+    def stop(self):
+        del self._quart
+        return self # fluent I/F
     
     def create_routes(self, db_facade): # Attention 
 
@@ -28,10 +35,5 @@ class WebController(): # 'wrapper' around Quart
 
         return self # fluent I/F
 
-    def start(self): # public
-       self._quart.run()
-       return self # fluent I/F
-
-    def stop(self):
-        del self._quart
-        return self # fluent I/F
+def create_server(config):
+    return WebController(config)
