@@ -11,7 +11,7 @@ def singleton(cls): # PEP 318
     return getinstance
 
 # Use enum instead? TODO
-#from enum import Enum
+# from enum import Enum
 class SQLCode():
     """_summary_
     Return object from execute stmt in SQL.
@@ -32,11 +32,12 @@ class SQLCode():
 @singleton
 class DbInstance:
     """_summary_
-        Encapsulate SQLite3 connection. 
+        Encapsulate SQLite3 connections. 
         - Provide query methods
         - Provide update methods
         - Bulk operations
         - etc.
+        TODO: implement connection pool, transactions, caching
     """
 
     def __init__(self, db_file_path: Path):
@@ -50,6 +51,7 @@ class DbInstance:
         finally:
             if conn is not None:
                 conn.close()
+                conn = None
 
     # Execute raw SQL string; client responsibility for correctness!
     def execute_sql(self, raw_sql: str) -> SQLCode:
@@ -84,12 +86,15 @@ class DbInstance:
         sql += ";"
         return self.execute_sql(sql)
 
-    def query_db(self, sql_query) -> list:
+    # Similar to 'execute', the client is responsible for proper SQL!
+    # Invoke 'fetchall' on result from cursor and return rows.
+    def query(self, sql_query) -> list:
         conn = sqlite3.connect(self._db_file_path)
         res = None
         with self._DbAccessor(conn) as cur:
             try:
-                res = cur.execute(sql_query)
+                _temp_res = cur.execute(sql_query)
+                res = _temp_res.fetchall()
             except sqlite3.DatabaseError as ex:
                 res = ex
         return res
@@ -100,7 +105,7 @@ class DbInstance:
     class _DbAccessor(): 
         """
         'Wrapper' around sqlite3 connection; to be used with 'with .. as'
-        - mimic transactional behaviour
+        - mimic transactional behaviour: always committed at the end!
         """
 
         def __init__(self, conn):
@@ -120,4 +125,4 @@ class DbInstance:
 
 # utility
 def create_proxy(db_path: Path):
-    return DbInstance(db_path) # creates new instance; however marked singleton..
+    return DbInstance(db_path) # creates new SQLite3 instance; however marked singleton..

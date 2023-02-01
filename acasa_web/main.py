@@ -5,8 +5,10 @@
 #############################################################################
 #import importlib as imp
 import os
+import json
 import yaml
 import pathlib
+import redis
 from quart import Quart, render_template
 
 THIS_PATH = pathlib.Path(__file__).parent
@@ -18,16 +20,16 @@ with open(CONFIG_PATH, mode = "r", encoding = "UTF-8") as openfile:
     cfg_text = openfile.read()
     config = yaml.safe_load(cfg_text)
 
-# Provide a means to initialize the database and web server;
+# Provide a means to initialize the database and the web server;
 # Things don't get started here.. Goal is to initialize properly!
-# modularized because of invocation from __init__.py, s.th.
+# functionalized because of invocation from __init__.py, s.th.
 def _init_controls(db_mod): 
     init_seq = 0
     db_name = config['database']['file_name']
     db_path = os.path.join(os.path.dirname(__file__), db_name)
     global db_proxy # export
     db_proxy = db_mod.create_proxy(db_path)
-    
+    # create_server(config['web']) no, lazy..
     return init_seq
 
 def create_server(web_config):
@@ -64,25 +66,40 @@ def create_server(web_config):
     )
 
 class RequestMapper():
+    """ Routing.
+        - Deliver static files;
+        - Provide 'RESTful' API;
+    """
     
-    def __init__(self, quart_instance: Quart):
+    def __init__(self, quart_inst: Quart):
 
-        @quart_instance.route('/')
+        @quart_inst.route('/')
         async def index():
             return await render_template('index.html')
 
-        @quart_instance.route('/products/')
+        @quart_inst.route('/products/')
         async def list_products():
-            _sql = "SELECT * FROM products"
+            _sql = """SELECT p.name AS product_name, 
+                             p.price AS Product_price, 
+                             c.name AS category_name 
+                       FROM products p, categories c 
+                       WHERE p.category_id = c.id"""
             prods = db_proxy.query(_sql)
-            return 'products'
+            prod_by_cat = dict()
+            for p_name, p_price, p_category in prods:
+                if not p_category in prod_by_cat:
+                    prod_by_cat[p_category] = list()
+                prod_by_cat[p_category].append({"name": p_name, "price": p_price})
+            return prod_by_cat
+        
+
 
 ###################
 # Utility methods #
 ###################
 
 # The schema file resides in the current directory and must be splitted into a 
-# set of strings;
+# set of strings that are executed in their own transaction (no bulk).
 def init_db():
     sql_stmts = list()
     with open(SQL_PATH, mode = "r", encoding = "UTF-8") as sql:
@@ -105,11 +122,11 @@ def init_db():
 ###############################################################################
 
 def run_test_suite():
-   pass
+   print("Running tests..")
 
 def main():
     while True:
-        print("This is the main program. Enter 'z' to leave the program, 't' to run the test suite, \
+        print("This is the main program. Enter 'z' to leave the program, 't' to run the test suite, or \
             's' to run the Quart server in DEBUG mode.")
         user_input = input("\n>")
         if user_input == 'z': break
@@ -122,7 +139,7 @@ def main():
 
 if __name__ == "__main__":
     print("Startup script called on ACASA main directly - checking parameters set..")
-    # import in script didn't work!! (Package problem??)
+    # import in script-self didn't work!! (Package problem??)
     import db as db_mod
     _init_controls(db_mod)
     main()

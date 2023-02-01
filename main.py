@@ -71,7 +71,7 @@ def start_db_admin(main):
             main.init_db()     
         elif user_choice == '2':
             print("Loading files.. ")
-            db_controller = main.get_db_proxy() # get hold of DB controller (facade)
+            db_controller = main.db_proxy # get hold of DB controller (facade)
             for file_def in CSV_FILES:
                 entity_name = file_def[0]
                 cols = file_def[1]
