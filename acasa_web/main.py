@@ -10,6 +10,7 @@ import yaml
 import pathlib
 import redis
 from quart import Quart, render_template
+import uvicorn
 
 THIS_PATH = pathlib.Path(__file__).parent
 CONFIG_PATH = "{}{}{}".format(THIS_PATH.resolve(), os.sep, "config.yml")
@@ -27,14 +28,20 @@ def _init_controls(db_mod):
     init_seq = 0
     db_name = config['database']['file_name']
     db_path = os.path.join(os.path.dirname(__file__), db_name)
-    global db_proxy # export
+    global db_proxy # export (instead of getter function)
     db_proxy = db_mod.create_proxy(db_path)
-    # create_server(config['web']) no, lazy..
+    # Initialize (not start) Quart web server
+    global web_app
+    web_app = create_server(config['web'])
+    RequestMapper(web_app)
+    # Redis cache
+    global cache 
+    cache = redis.Redis()
     return init_seq
 
 def create_server(web_config):
     """
-    Quart initialization; muust be done from main.py because the config.yaml sits there..
+    Quart initialization; must be done from main.py because the config.yaml sits there..
     From scaffold.py: 
     def __init__(
         self,
@@ -64,18 +71,54 @@ def create_server(web_config):
         static_url_path = "/",
         template_folder = template_dir.resolve()
     )
+    return web_app
 
+_PROD_SQL = """SELECT p.name AS product_name, 
+        p.price AS Product_price, 
+        c.name AS category_name 
+FROM products p, categories c 
+WHERE p.category_id = c.id"""
+#_PIZZA_SQL = _PROD_SQL + " AND c.name = 'Pizzas"
+#_AUFLAUF_SQL = _PROD_SQL + " AND c.name = 'Pasta"
+#_DRINKS_SQL = _PROD_SQL + " AND c.name = 'Drinks"
 class RequestMapper():
     """ Routing.
         - Deliver static files;
         - Provide 'RESTful' API;
     """
-    
-    def __init__(self, quart_inst: Quart):
+    def __init__(self, quart_inst: Quart):        
+        prods = db_proxy.query(_PROD_SQL)
+        prods_by_cat = dict()
+        for p_name, p_price, p_category in prods:
+            if not p_category in prods_by_cat:
+                prods_by_cat[p_category] = list()
+            prods_by_cat[p_category].append({"name": p_name, "price": p_price})
+        self._prods = prods_by_cat # Cache all prods/categories in dict
 
         @quart_inst.route('/')
         async def index():
-            return await render_template('index.html')
+            return await render_template("index.html", cats = list(self._prods))
+
+        # TODO generate links according to self._prods dictionary!
+
+        @quart_inst.route('/Pizzas')
+        async def pizzas():
+            pizzas = self._prods["Pizzas"]
+            return await render_template("index.html", cats = list(self._prods), prods = pizzas)
+
+        @quart_inst.route('/Drinks')
+        async def drinks():
+            drinks = self._prods["Drinks"]
+            return await render_template("index.html", cats = list(self._prods), prods = drinks)
+
+        @quart_inst.route('/Pasta')
+        async def pasta():
+            pasta = self._prods["Pasta"]
+            return await render_template("index.html", cats = list(self._prods), prods = pasta)
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        #                 REST!                      #
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
         @quart_inst.route('/products/')
         async def list_products():
@@ -83,23 +126,23 @@ class RequestMapper():
                              p.price AS Product_price, 
                              c.name AS category_name 
                        FROM products p, categories c 
-                       WHERE p.category_id = c.id"""
+                       WHERE p.category_id = c.id
+                       AND c.id = 
+                       """
             prods = db_proxy.query(_sql)
             prod_by_cat = dict()
             for p_name, p_price, p_category in prods:
                 if not p_category in prod_by_cat:
                     prod_by_cat[p_category] = list()
                 prod_by_cat[p_category].append({"name": p_name, "price": p_price})
-            return prod_by_cat
-        
-
+            return prod_by_cat # Automatic JSON converting! :-)
 
 ###################
 # Utility methods #
 ###################
 
-# The schema file resides in the current directory and must be splitted into a 
-# set of strings that are executed in their own transaction (no bulk).
+# Initialize the database schema. The schema file resides in the current directory and 
+# must be splitted into a set of strings that are executed in their own transaction (no bulk).
 def init_db():
     sql_stmts = list()
     with open(SQL_PATH, mode = "r", encoding = "UTF-8") as sql:
@@ -124,18 +167,19 @@ def init_db():
 def run_test_suite():
    print("Running tests..")
 
-def main():
+def main(): # Provide user control via cmd line input
     while True:
-        print("This is the main program. Enter 'z' to leave the program, 't' to run the test suite, or \
-            's' to run the Quart server in DEBUG mode.")
+        print("This is the main program. Enter 't' to run the test suite,\
+            'd' to run the Quart server in DEBUG mode, 's' to start the web server with uvicorn. \
+            \nEnter 'z' to leave the program.")
         user_input = input("\n>")
         if user_input == 'z': break
-        elif user_input == 't':
+        elif user_input == 't': # run test suite (TODO) 
             run_test_suite()
-        elif user_input == 's':
-            create_server(config['web'])
-            RequestMapper(web_app)
+        elif user_input == 'd': # debug 
             web_app.run()
+        elif user_input == 's': # start uvicorn server
+            uvicorn.run("__main__:web_app", host=config["web"]["host_name"], port=config["web"]["host_port"], log_level="info")
 
 if __name__ == "__main__":
     print("Startup script called on ACASA main directly - checking parameters set..")

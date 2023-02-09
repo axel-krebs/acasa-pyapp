@@ -1,102 +1,143 @@
 /* global */
 @import url('https://fonts.googleapis.com/css?family=Roboto');
 
-.grid-2{
-    display: grid;
-    grid-template-columns: repeat(2,1fr);
-}
-
-body{
+body {
     margin: 0;
     padding: 0;
     font-family: 'Roboto', sans-serif;
-    background-color: #101214;
-    color: #7A7C80;
-
+    background: url('/waves-washing-off-the-beach.jpg');
+    background-size: cover;
 }
 
-h2,.white{
+h2,.white {
     color: #fff;
 }
 
-a{
-    color: #7A7C80;
+.abgedeckt {
+    background-color: black;
+    opacity: 0.5;
+    color: aliceblue;
+}
+
+.eingerueckt {
+    padding-left: 10px;
+}
+
+a {
     text-decoration: none;
 }
-/* section 1 */
-.section-1{
-    padding-top: 40vh;
-    text-align: center;
+
+.grid-container {
+    display: grid;
+    grid-template-columns: 250px 1200px auto;
+    grid-template-rows: 100px auto 100px;
+    height: 100vh;
+    width: 100vw;
 }
 
-.section-1 p{
-    font-size: 1.1rem;
-    padding-bottom: 10px;
-    margin:0;
+.space-1 {
+    
 }
 
-.section-1 h2{
-    font-size: 1.7rem;
-    margin-bottom: 10px;
+/* header-1 */
+
+.header-1 {
+    display: flex;
+    flex-direction: row;
 }
 
-.section-1 a{
-    font-size: 1.5rem;
-    padding: 10px;
-}
-/* section 2 */
-.section-2{
-    padding-top: 10vh;
-    width: 70%;
+.banner {
+    flex-grow: 1;
 }
 
-.section-2 h2{
-    font-size: 1.7rem;
-    margin-bottom: 10px;
+.login {
+    flex-grow: 0;
+    width: 200px;
 }
 
-.section-2 p{
-    font-size: 1.1rem;
-    padding-bottom: 10px;
-    margin:0;
+/* menu 1 */
+.menu-1 {
+    font-family: cursive;
 }
 
-.section-2 a{
+.menu-1 a {
     display: block;
     padding: 5px;
-    font-size: 1.2rem;
     padding-left: 0;
-    width: 100px;
+    font-size: 1.5rem;
 }
-/* animations / utilities */
-.section-2 a:hover{
+
+.menu-1 a:hover {
     font-size: 1.3rem;
     color: #fff;
     cursor: pointer;
     transition: 0.2s;
 }
 
-.section-1 a:hover{
+/* section 1 */
+
+.section-1 {
+    height: 100%;
+    padding-top: 20px;
+}
+
+.section-1 h2 {
+    font-size: 1.7rem;
+    margin-bottom: 10px;
+}
+
+.section-1 p {
+    font-size: 1.1rem;
+    padding-bottom: 10px;
+}
+
+.aside-1 {
+    
+}
+
+/* footer 1 */
+
+.footer-1 {
+    text-align: center;
+    padding: 10px;
+}
+
+.footer-1 p {
+    font-size: 1.1rem;
+    padding-bottom: 10px;
+    margin-top: 10px;
+}
+
+.footer-1 h2 {
+    font-size: 1.7rem;
+}
+
+.footer-1 a {
+    font-size: 1.5rem;
+    padding: 5px;
+}
+
+.footer-1 a:hover {
     color: #fff;
     cursor: pointer;
     transition: 0.3s;
 }
 
-.white:hover{
+.white:hover {
     position: relative;
     padding-left: 10px;
 }
 
 /* media queres */
 @media(max-width:780px){
-    .grid-2{
+    .grid-container{
         grid-template-columns: 1fr;
     }
-    .section-1{
+    .footer-1 {
         padding:0;
         padding-top: 5rem;
     }
-    .section-2{
+    .section-1 {
         padding: 0;
         padding-left: 1.5rem;
         padding-top: 2rem;

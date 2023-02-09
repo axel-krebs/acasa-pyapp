@@ -2,6 +2,8 @@ version: 1
 database:
   file_name: "portal.db3"
 web:
+  host_name: "localhost"
+  host_port: 5000
   import_name: "acasa-customer-portal"
   static_folder: "static"
   static_url_path: "/"
