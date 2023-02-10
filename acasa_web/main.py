@@ -9,7 +9,7 @@ import json
 import yaml
 import pathlib
 import redis
-from quart import Quart, render_template
+from quart import Quart, session, render_template
 import uvicorn
 
 THIS_PATH = pathlib.Path(__file__).parent
@@ -71,6 +71,7 @@ def create_server(web_config):
         static_url_path = "/",
         template_folder = template_dir.resolve()
     )
+    web_app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
     return web_app
 
 _PROD_SQL = """SELECT p.name AS product_name, 
@@ -78,15 +79,14 @@ _PROD_SQL = """SELECT p.name AS product_name,
         c.name AS category_name 
 FROM products p, categories c 
 WHERE p.category_id = c.id"""
-#_PIZZA_SQL = _PROD_SQL + " AND c.name = 'Pizzas"
-#_AUFLAUF_SQL = _PROD_SQL + " AND c.name = 'Pasta"
-#_DRINKS_SQL = _PROD_SQL + " AND c.name = 'Drinks"
+
 class RequestMapper():
     """ Routing.
-        - Deliver static files;
-        - Provide 'RESTful' API;
+        - Deliver static files
+        - Cache content
+        - Provide 'RESTful' API (SQL-to-JSON mapping)
     """
-    def __init__(self, quart_inst: Quart):        
+    def _init_cache(self):
         prods = db_proxy.query(_PROD_SQL)
         prods_by_cat = dict()
         for p_name, p_price, p_category in prods:
@@ -95,26 +95,52 @@ class RequestMapper():
             prods_by_cat[p_category].append({"name": p_name, "price": p_price})
         self._prods = prods_by_cat # Cache all prods/categories in dict
 
+    def _invalidate_cache(self):
+        del self._prods
+
+    def __init__(self, quart_inst: Quart):
+        """_summary_
+            Using this instance to cache some data; attention: DO NOT CHANGE INDENTATION!!
+            TODO: Use Redis
+        Args:
+            quart_inst (Quart): _description_
+
+        Returns:
+            _type_: A RequestMapper object
+        """
+        self._init_cache()
+
+        @quart_inst.before_request
+        def make_session_permanent():
+            session.permanent = True
+
         @quart_inst.route('/')
         async def index():
-            return await render_template("index.html", cats = list(self._prods))
+            return await render_template("index.html", 
+                cats = list(self._prods))
 
         # TODO generate links according to self._prods dictionary!
 
         @quart_inst.route('/Pizzas')
         async def pizzas():
             pizzas = self._prods["Pizzas"]
-            return await render_template("index.html", cats = list(self._prods), prods = pizzas)
+            return await render_template("index.html", 
+                cats = list(self._prods), 
+                prods = pizzas)
 
         @quart_inst.route('/Drinks')
         async def drinks():
             drinks = self._prods["Drinks"]
-            return await render_template("index.html", cats = list(self._prods), prods = drinks)
+            return await render_template("index.html", 
+                cats = list(self._prods), 
+                prods = drinks)
 
         @quart_inst.route('/Pasta')
         async def pasta():
             pasta = self._prods["Pasta"]
-            return await render_template("index.html", cats = list(self._prods), prods = pasta)
+            return await render_template("index.html", 
+                cats = list(self._prods), 
+                prods = pasta)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         #                 REST!                      #
@@ -123,12 +149,12 @@ class RequestMapper():
         @quart_inst.route('/products/')
         async def list_products():
             _sql = """SELECT p.name AS product_name, 
-                             p.price AS Product_price, 
-                             c.name AS category_name 
-                       FROM products p, categories c 
-                       WHERE p.category_id = c.id
-                       AND c.id = 
-                       """
+                                p.price AS Product_price, 
+                                c.name AS category_name 
+                        FROM products p, categories c 
+                        WHERE p.category_id = c.id
+                        AND c.id = 
+                        """
             prods = db_proxy.query(_sql)
             prod_by_cat = dict()
             for p_name, p_price, p_category in prods:

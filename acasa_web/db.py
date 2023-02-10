@@ -56,7 +56,7 @@ class DbInstance:
     # Execute raw SQL string; client responsibility for correctness!
     def execute_sql(self, raw_sql: str) -> SQLCode:
         conn = sqlite3.connect(self._db_file_path)
-        with self._DbAccessor(conn) as cur:
+        with self._TransactionalDbAccessor(conn) as cur:
             try: 
                 cur.execute(raw_sql)
                 return SQLCode("SUCCESS")
@@ -78,7 +78,7 @@ class DbInstance:
         cnt = 0 # needed for comma!
         while cnt < len(keys):
             cur_key = keys[cnt]
-            if str(cur_key) != key_field: # omit "id" field for UPSERT
+            if str(cur_key) != key_field: # omit "id" field for UPSERT, s. function parameter
                 sql += " " + str(cur_key).lower() + "=" + "excluded." + str(cur_key).lower()
                 if cnt < len(keys) - 1:
                     sql += ","
@@ -91,7 +91,7 @@ class DbInstance:
     def query(self, sql_query) -> list:
         conn = sqlite3.connect(self._db_file_path)
         res = None
-        with self._DbAccessor(conn) as cur:
+        with self._TransactionalDbAccessor(conn) as cur:
             try:
                 _temp_res = cur.execute(sql_query)
                 res = _temp_res.fetchall()
@@ -102,7 +102,7 @@ class DbInstance:
     def query_by_example(self, example) -> list:
         pass
 
-    class _DbAccessor(): 
+    class _TransactionalDbAccessor(): 
         """
         'Wrapper' around sqlite3 connection; to be used with 'with .. as'
         - mimic transactional behaviour: always committed at the end!
