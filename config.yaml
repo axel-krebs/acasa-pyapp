@@ -2,23 +2,20 @@ version: 1
 license_key: "li87Dd96Dh8zG/(c7g7)CGs70hihhhi/GkBfubumö"
 billing:
     currency: "€"
-repertoire: {
-    "Pizzas": [
-        {"id": 100, "name": "Pizza Margaritha", "price": 5.0}, 
-        {"id": 101, "name": "Pizza Thunfisch", "price": 6.0}, 
-        {"id": 102, "name": "Pizza Funghi", "price": 7.0},
-    ],
-    "Aufläufe": [
-        {"id": 200, "name": "Auflauf Nudeln", "price": 7.0}, 
-        {"id": 201, "name": "Auflauf Kartoffeln", "price": 6.0}, 
-    ],
-    "Getränke": [
-        {"id": 300, "name": "Pepsi Cola", "price": 2.50}, 
-        {"id": 301, "name": "Fritz! Cola", "price": 3.50}, 
-     ],
-    "Deserts": [
-        {"id": 555, "name": "Tiramisu", "price": 6.66}, 
-    ]}
+csv_files: 
+    categories: 
+        - ID
+        - NAME
+    products:
+        - ID
+        - NAME
+        - PRICE
+        - CATEGORY_ID
+    customers:
+        - ID
+        - NAME
+        - EMAIL
+        - PASS_WORD
 messages: {
     "EN": {
         "what_to_order": "What do want to order? Enter a number from above.",

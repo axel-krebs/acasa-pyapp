@@ -8,9 +8,9 @@ import errors as ERR
 from pathlib import Path
 import csv
 import pandas as pd
-from license_management import *
-from output_management import *
-from order_management import *
+import license_management as L_M
+import output_management as OUTPUT_MGMT
+import order_management as ORDER_MGMT
 from acasa_admin.admin_gup import start_admin_app
 
 os.chdir(Path(__file__).parent)
@@ -19,16 +19,13 @@ SCRIPT_PATH = Path(__name__).parent.resolve()
 
 # Metadata for CSV-import files: attributes must be in the given list!
 # Format: {table_name => [attribute1, attribute2, etc.]}
-CSV_FILES = [
-    ("categories",["ID","NAME"]),
-    ("products",["ID","NAME","PRICE","CATEGORY_ID"]),
-    ("customers",["ID","NAME","EMAIL","PASS_WORD"])
-]
+CONFIG_FILE = 'config.yaml'
 
 def show_environment():
     print("Pandas: ", pd.__version__)
     print("CSV: ", csv.__version__)
-    
+
+# load config.yaml automatically 
 def load_config() -> dict:
     """ Load the menu from a YAML file.
         TODO: Make this function private to this script.. ;-)
@@ -38,21 +35,23 @@ def load_config() -> dict:
     Returns:
         dict: The configuration as dict.
     """
-    with open("./acasa.yml", mode = "r", encoding = "UTF-8") as openfile:
+    with open(str(SCRIPT_PATH) + "/" + CONFIG_FILE, mode = "r", encoding = "UTF-8") as openfile:
         cfg_text = openfile.read()
         config = yaml.safe_load(cfg_text)
-        if not check_valid(config["license_key"]):
+        if not L_M.check_valid(config["license_key"]):
             raise ERR.LicenseError("Your license has probably expired.. :-)")
     return config
 
 
-def start_db_admin(main):
+def start_db_admin(main,entities):
     while True:
         print("You're in DB admin. Pls. choose from following operations:")
         print("\t0. Quit DB admin.")
         print("\t1. Initialize database (schema creation).")
         print("\t2. Load data from CSV.")
         print("\t3. Enter custom SQL.")
+        # get hold of DB controller (facade)
+        db_controller = main.db_proxy 
         user_choice = input("\t>")
         if user_choice == '0':
             break
@@ -60,12 +59,10 @@ def start_db_admin(main):
             main.init_db()     
         elif user_choice == '2':
             print("Loading files.. ")
-            db_controller = main.db_proxy # get hold of DB controller (facade)
-            for file_def in CSV_FILES:
-                entity_name = file_def[0]
-                cols = file_def[1]
+            for entity_name in entities:
+                attrs = entities[entity_name]
                 csv_file_path = "{}{}{}.csv".format(SCRIPT_PATH.resolve(), os.sep, entity_name)
-                res_csv = load_csv(csv_file_path, cols)
+                res_csv = load_csv(csv_file_path, attrs)
 
                 # convert to SQL string; TODO move this code to a mapping facade object!
                 for data_set in res_csv:
@@ -122,7 +119,7 @@ def menu():
             show_environment()
         elif user_choice == "dba":
             from acasa_web import main # lazy loading allowed here..
-            start_db_admin(main)
+            start_db_admin(main, config["csv_files"])
         elif user_choice == "web":
             from acasa_web import main # lazy loading allowed here..
             web_controller  = main.web_app
