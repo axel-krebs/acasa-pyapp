@@ -5,7 +5,6 @@
 #############################################################################
 #import importlib as imp
 import os
-import json
 import yaml
 import pathlib
 import redis
