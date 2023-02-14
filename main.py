@@ -12,20 +12,19 @@ import license_management as L_M
 import output_management as OUTPUT_MGMT
 import order_management as ORDER_MGMT
 from acasa_admin.admin_gup import start_admin_app
+from db import create_proxy
 
 os.chdir(Path(__file__).parent)
 
 SCRIPT_PATH = Path(__name__).parent.resolve()
+DB_PATH = os.path.join(os.path.dirname(__file__), 'product.db3')
+SQL_PATH = Path("{}{}acasa_schema.sql".format(SCRIPT_PATH, os.sep))
 
 # Metadata for CSV-import files: attributes must be in the given list!
 # Format: {table_name => [attribute1, attribute2, etc.]}
-CONFIG_FILE = 'config.yaml'
+CONFIG_FILE = Path("{}{}config.yaml".format(SCRIPT_PATH, os.sep))
 
-def show_environment():
-    print("Pandas: ", pd.__version__)
-    print("CSV: ", csv.__version__)
-
-# load config.yaml automatically 
+# load config.yaml 
 def load_config() -> dict:
     """ Load the menu from a YAML file.
         TODO: Make this function private to this script.. ;-)
@@ -35,12 +34,31 @@ def load_config() -> dict:
     Returns:
         dict: The configuration as dict.
     """
-    with open(str(SCRIPT_PATH) + "/" + CONFIG_FILE, mode = "r", encoding = "UTF-8") as openfile:
+    with open(CONFIG_FILE, mode = "r", encoding = "UTF-8") as openfile:
         cfg_text = openfile.read()
         config = yaml.safe_load(cfg_text)
         if not L_M.check_valid(config["license_key"]):
             raise ERR.LicenseError("Your license has probably expired.. :-)")
     return config
+
+# Initialize the database schema. The schema file resides in the current directory and 
+# must be splitted into a set of strings that are executed in their own transaction (no bulk).
+def create_schema():
+    sql_stmts = list()
+    with open(SQL_PATH, mode = "r", encoding = "UTF-8") as sql:
+        current_str = ""
+        for line in sql.readlines():
+            if line.startswith("--"): continue
+            elif line.rfind(";") > 0:
+                left_str, right_str = line.split(";")
+                sql_stmts.append(current_str + left_str) # no strip, line break is in right string
+                current_str = ""
+            else:
+                current_str += line.strip("\n") # remove Zeilenumbruch    
+   
+    for sql_stmt in sql_stmts:
+        res_code = db_proxy.execute_sql(sql_stmt)
+        print("SQL executed: {}, result is: {}".format(sql_stmt, res_code))
 
 
 def start_db_admin(main,entities):
@@ -51,12 +69,12 @@ def start_db_admin(main,entities):
         print("\t2. Load data from CSV.")
         print("\t3. Enter custom SQL.")
         # get hold of DB controller (facade)
-        db_controller = main.db_proxy 
+
         user_choice = input("\t>")
         if user_choice == '0':
             break
         elif user_choice == '1':
-            main.init_db()     
+            create_schema()    
         elif user_choice == '2':
             print("Loading files.. ")
             for entity_name in entities:
@@ -68,22 +86,12 @@ def start_db_admin(main,entities):
                 for data_set in res_csv:
                     
                     # send to controller
-                    sql_code = db_controller.upsert(entity_name, data_set, "id")
+                    sql_code = db_proxy.upsert(entity_name, data_set, "id")
                     print("SQL returned: ", sql_code)
         elif user_choice == '3':
             custom_sql = input("SQL>")
-            res_csv = db_controller.execute_sql(custom_sql)
+            res_csv = db_proxy.execute_sql(custom_sql)
             print("SQL executed: {}, result is: {}".format(custom_sql, res_csv))
-
-# Depricated! TODO Introduce integration tests
-def start_order_management(config, lang):
-    order = take_order(config, lang) # TODO pass language as program arg!
-    print()
-    print("Quittung")
-    sum_all = print_receipt(order)
-    print (f"Vielen Dank für Ihre Bestellung über {sum_all} € und auf Wiedersehen!")
-    # return anything?
-    return order
 
 def load_csv(file_path: Path, fn: list) -> list:
     ret_list = []
@@ -94,7 +102,12 @@ def load_csv(file_path: Path, fn: list) -> list:
             ret_list.append(line)
     return ret_list
 
+def show_environment():
+    print("Pandas: ", pd.__version__)
+    print("CSV: ", csv.__version__)
+
 def print_menu():
+    print()
     print("\tOptions: ")
     print("\tq -> Quit this program.")
     print("\tenv -> Check environment.")
@@ -104,8 +117,7 @@ def print_menu():
     print("\ttest -> Test: Take order (life test via command line)")
 
 def menu():
-    config = load_config()
-    admin_language = "EN"
+    ADMIN_LANGUAGE = "EN" # TODO Pass as program arg
     print("Acasa Restaurant Administration. ") # TODO logging
     while True:
         print_menu()
@@ -122,16 +134,33 @@ def menu():
             start_db_admin(main, config["csv_files"])
         elif user_choice == "web":
             from acasa_web import main # lazy loading allowed here..
-            web_controller  = main.web_app
+            import sample
+            main.deploy_unit(sample.create_deployment(db_proxy))
+            main.start_server()
             # TODO Provide commands for controllers
         elif user_choice == "gui":
             print("Opening admin GUI") # TODO log
             start_admin_app()
         elif user_choice == "test":
             print("Starting order preview.")
-            order = start_order_management(config, admin_language)
-            print_receipt(order)
+            order = start_order_management(config, ADMIN_LANGUAGE)
+            OUTPUT_MGMT.print_receipt(order)
         else:
             print("You've entered an invalid choice.")
-                
-menu()
+
+config = load_config()
+db_name = config['database']['file_name']
+db_path = os.path.join(os.path.dirname(__file__), db_name)
+db_proxy = create_proxy(db_path)
+
+menu() # main()
+
+# Depricated! TODO Introduce integration tests
+def start_order_management(config, lang):
+    order = ORDER_MGMT.take_order(config, lang) # TODO pass language as program arg!
+    print()
+    print("Quittung")
+    sum_all = OUTPUT_MGMT.print_receipt(order)
+    print (f"Vielen Dank für Ihre Bestellung über {sum_all} € und auf Wiedersehen!")
+    # return anything?
+    return order

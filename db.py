@@ -51,7 +51,7 @@ class DbInstance:
         finally:
             if conn is not None:
                 conn.close()
-                conn = None
+                del conn
 
     # Execute raw SQL string; client responsibility for correctness!
     def execute_sql(self, raw_sql: str) -> SQLCode:

@@ -2,6 +2,8 @@ version: 1
 license_key: "li87Dd96Dh8zG/(c7g7)CGs70hihhhi/GkBfubumö"
 billing:
     currency: "€"
+database:
+    file_name: products.db3
 csv_files: 
     categories: 
         - ID

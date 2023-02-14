@@ -8,9 +8,11 @@ CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     price REAL,
+    category TEXT
     category_id INTEGER,
     FOREIGN KEY (category_id) REFERENCES categories(id)
 );
+--ALTER TABLE ADD CONSTRAINT name_exists CHECK category IN ['Pizza'];
 CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
