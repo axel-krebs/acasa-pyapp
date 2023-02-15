@@ -1,5 +1,5 @@
 # Example web mapping 
-from acasa_web.web import Deployment
+from web import Deployment
 from db import DbInstance
 
 _PROD_SQL = """SELECT p.name AS product_name, 
@@ -26,7 +26,7 @@ class SampleDeployment(Deployment):
         def _invalidate_cache(self):
                 del self._prods
            
-        def apply(self, asgi_RT, render_func): # replaces '__init__' in original class
+        def apply(self, asgi_RT, render_func): # overriden
                 
                 @asgi_RT.route('/')
                 async def index():
@@ -54,10 +54,6 @@ class SampleDeployment(Deployment):
                         return await render_func("index.html", 
                                 cats = list(self._prods), 
                                 prods = pasta)
-
-                # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-                #                 REST!                      #
-                # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
                 @asgi_RT.route('/products/')
                 async def list_products():

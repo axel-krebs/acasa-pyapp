@@ -61,7 +61,7 @@ def create_schema():
         print("SQL executed: {}, result is: {}".format(sql_stmt, res_code))
 
 
-def start_db_admin(main,entities):
+def start_db_admin(entities):
     while True:
         print("You're in DB admin. Pls. choose from following operations:")
         print("\t0. Quit DB admin.")
@@ -112,7 +112,7 @@ def print_menu():
     print("\tq -> Quit this program.")
     print("\tenv -> Check environment.")
     print("\tdba -> Access DB administration.")
-    print("\tweb -> Access customer portal (web).")
+    print("\tweb -> Run the sample web application (web-a-casa).")
     print("\tgui -> Open admin GUI.")
     print("\ttest -> Test: Take order (life test via command line)")
 
@@ -130,13 +130,14 @@ def menu():
             print("Checking environment..")
             show_environment()
         elif user_choice == "dba":
-            from acasa_web import main # lazy loading allowed here..
-            start_db_admin(main, config["csv_files"])
+            start_db_admin(config["csv_files"])
         elif user_choice == "web":
-            from acasa_web import main # lazy loading allowed here..
-            import sample
-            main.deploy_unit(sample.create_deployment(db_proxy))
-            main.start_server()
+            from web import create_instance
+            from sample import create_deployment
+            WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, "acasa_web_1"))
+            web_inst_1 = create_instance(WEB_PATH)
+            web_inst_1.deploy(create_deployment(db_proxy))
+            web_inst_1.start_server()
             # TODO Provide commands for controllers
         elif user_choice == "gui":
             print("Opening admin GUI") # TODO log
