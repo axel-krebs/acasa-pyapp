@@ -20,13 +20,13 @@ class SampleDeployment(Deployment):
                 for p_name, p_price, p_category in prods:
                         if not p_category in prods_by_cat:
                                 prods_by_cat[p_category] = list()
-                                prods_by_cat[p_category].append({"name": p_name, "price": p_price})
+                        prods_by_cat[p_category].append({"name": p_name, "price": p_price})
                 self._prods = prods_by_cat # Cache all prods/categories in dict
 
         def _invalidate_cache(self):
                 del self._prods
            
-        def apply(self, asgi_RT, render_func): # overriden
+        def apply(self, asgi_RT, render_func): # overridden
                 
                 @asgi_RT.route('/')
                 async def index():
@@ -77,4 +77,7 @@ def create_deployment(db_instance):
 
 if __name__ == "__main__":
     print("This is a deployment unit and cannot be run directly! Usage:")
-    print("acasa_web.deploy(this)")
+    print("""from sample import create_deployment
+             deployment1 = create_deployment(db_proxy)
+             web_inst_1.deploy(deployment1)
+          """)

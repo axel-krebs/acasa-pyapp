@@ -93,3 +93,4 @@ def create_instance(root: Path = SCRIPT_PATH) -> Deployer:
 
 if __name__ == "__main__":
     print("This is a library and cannot be invoked directly; pls. use 'import'.")
+    # raise error?

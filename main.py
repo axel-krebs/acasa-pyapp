@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
-# Restaurant ACASA client utitlities
+# Restaurant ACASA client utilities
 import test
 import yaml
 import os
@@ -18,7 +18,7 @@ os.chdir(Path(__file__).parent)
 
 SCRIPT_PATH = Path(__name__).parent.resolve()
 DB_PATH = os.path.join(os.path.dirname(__file__), 'product.db3')
-SQL_PATH = Path("{}{}acasa_schema.sql".format(SCRIPT_PATH, os.sep))
+SQL_PATH = Path("{}{}products_db.sql".format(SCRIPT_PATH, os.sep))
 
 # Metadata for CSV-import files: attributes must be in the given list!
 # Format: {table_name => [attribute1, attribute2, etc.]}
@@ -133,10 +133,11 @@ def menu():
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
             from web import create_instance
-            from sample import create_deployment
             WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, "acasa_web_1"))
             web_inst_1 = create_instance(WEB_PATH)
-            web_inst_1.deploy(create_deployment(db_proxy))
+            from sample import create_deployment
+            deployment1 = create_deployment(db_proxy)
+            web_inst_1.deploy(deployment1)
             web_inst_1.start_server()
             # TODO Provide commands for controllers
         elif user_choice == "gui":
