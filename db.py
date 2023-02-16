@@ -54,7 +54,7 @@ class DbInstance:
                 del conn
 
     # Execute raw SQL string; client responsibility for correctness!
-    def execute_sql(self, raw_sql: str) -> SQLCode:
+    def _execute_sql(self, raw_sql: str) -> SQLCode:
         conn = sqlite3.connect(self._db_file_path)
         with self._TransactionalDbAccessor(conn) as cur:
             try: 
@@ -74,7 +74,7 @@ class DbInstance:
         sql += ",".join(keys)
         sql += ") VALUES("
         sql += ",".join(values)
-        sql += ") ON CONFLICT (id) DO UPDATE SET "
+        sql += ") ON CONFLICT (id) DO UPDATE SET " # TODO: what if data_set was empty??
         cnt = 0 # needed for comma!
         while cnt < len(keys):
             cur_key = keys[cnt]
@@ -84,7 +84,7 @@ class DbInstance:
                     sql += ","
             cnt += 1
         sql += ";"
-        return self.execute_sql(sql)
+        return self._execute_sql(sql)
 
     # Similar to 'execute', the client is responsible for proper SQL!
     # Invoke 'fetchall' on result from cursor and return rows.

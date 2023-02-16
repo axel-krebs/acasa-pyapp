@@ -1,13 +1,13 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 # Restaurant ACASA client utilities
-import test
-import yaml
-import os
-import errors as ERR
-from pathlib import Path
+from arango import ArangoClient
 import csv
+import errors as ERR
+import os
 import pandas as pd
+from pathlib import Path
+import yaml
 import license_management as L_M
 import output_management as OUTPUT_MGMT
 import order_management as ORDER_MGMT
@@ -17,8 +17,7 @@ from db import create_proxy
 os.chdir(Path(__file__).parent)
 
 SCRIPT_PATH = Path(__name__).parent.resolve()
-DB_PATH = os.path.join(os.path.dirname(__file__), 'product.db3')
-SQL_PATH = Path("{}{}products_db.sql".format(SCRIPT_PATH, os.sep))
+SQL_PATH = Path("{}{}products_db.sql".format(SCRIPT_PATH, os.sep)) # hard-coded
 
 # Metadata for CSV-import files: attributes must be in the given list!
 # Format: {table_name => [attribute1, attribute2, etc.]}
@@ -47,9 +46,18 @@ def create_schema():
     sql_stmts = list()
     with open(SQL_PATH, mode = "r", encoding = "UTF-8") as sql:
         current_str = ""
+        comment_line = False
         for line in sql.readlines():
+            if line.startswith("**/"):
+                comment_line = False
+                continue
+            elif line.startswith("/**"):
+                comment_line = True
+            if comment_line: continue
+            # single-line comment
             if line.startswith("--"): continue
-            elif line.rfind(";") > 0:
+            # handle commented code
+            if line.rfind(";") > 0:
                 left_str, right_str = line.split(";")
                 sql_stmts.append(current_str + left_str) # no strip, line break is in right string
                 current_str = ""
@@ -57,9 +65,18 @@ def create_schema():
                 current_str += line.strip("\n") # remove Zeilenumbruch    
    
     for sql_stmt in sql_stmts:
-        res_code = db_proxy.execute_sql(sql_stmt)
+        res_code = db_proxy._execute_sql(sql_stmt)
         print("SQL executed: {}, result is: {}".format(sql_stmt, res_code))
 
+# Load product data into SQL database; assume customer has no interface to SQLite3 but Excel (CSV)
+def load_csv(file_path: Path, fn: list) -> list:
+    ret_list = []
+    with open(file_path,mode="r") as csv_file:
+        csv_reader = csv.DictReader(csv_file, fieldnames=fn, delimiter="|")
+        next(csv_reader) # skip headers
+        for line in csv_reader:
+            ret_list.append(line)
+    return ret_list
 
 def start_db_admin(entities):
     while True:
@@ -90,17 +107,8 @@ def start_db_admin(entities):
                     print("SQL returned: ", sql_code)
         elif user_choice == '3':
             custom_sql = input("SQL>")
-            res_csv = db_proxy.execute_sql(custom_sql)
+            res_csv = db_proxy._execute_sql(custom_sql)
             print("SQL executed: {}, result is: {}".format(custom_sql, res_csv))
-
-def load_csv(file_path: Path, fn: list) -> list:
-    ret_list = []
-    with open(file_path,mode="r") as csv_file:
-        csv_reader = csv.DictReader(csv_file, fieldnames=fn, delimiter="|")
-        next(csv_reader) # skip headers
-        for line in csv_reader:
-            ret_list.append(line)
-    return ret_list
 
 def show_environment():
     print("Pandas: ", pd.__version__)
@@ -155,11 +163,15 @@ db_name = config['database']['file_name']
 db_path = os.path.join(os.path.dirname(__file__), db_name)
 db_proxy = create_proxy(db_path)
 
+def arango_client():
+    arango_url = "http:{}:{}".format(config['arango']['host_name'], config['arango']['host_port']) # closure
+    return ArangoClient(arango_url)
+
 menu() # main()
 
 # Depricated! TODO Introduce integration tests
 def start_order_management(config, lang):
-    order = ORDER_MGMT.take_order(config, lang) # TODO pass language as program arg!
+    order = ORDER_MGMT.take_order(config, lang)
     print()
     print("Quittung")
     sum_all = OUTPUT_MGMT.print_receipt(order)

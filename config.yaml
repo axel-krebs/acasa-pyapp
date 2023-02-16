@@ -13,11 +13,17 @@ csv_files:
         - NAME
         - PRICE
         - CATEGORY_ID
-    customers:
-        - ID
-        - NAME
-        - EMAIL
-        - PASS_WORD
+#    customers:
+#        - ID
+#        - NAME
+#        - EMAIL
+#        - PASS_WORD
+arango:
+    host_name: localhost
+    host_port: 8529
+    db_name: acasa_db
+    app_user: acasa
+    app_password: Acasa#123
 messages: {
     "EN": {
         "what_to_order": "What do want to order? Enter a number from above.",
