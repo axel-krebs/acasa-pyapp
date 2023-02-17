@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 # Restaurant ACASA client utilities
-from arango import ArangoClient
+from arango import ArangoClient, version as arango_version
 import csv
 import errors as ERR
 import os
@@ -23,6 +23,11 @@ SQL_PATH = Path("{}{}products_db.sql".format(SCRIPT_PATH, os.sep)) # hard-coded
 # Metadata for CSV-import files: attributes must be in the given list!
 # Format: {table_name => [attribute1, attribute2, etc.]}
 CONFIG_FILE = Path("{}{}config.yaml".format(SCRIPT_PATH, os.sep))
+
+def show_environment():
+    print("Pandas: ", pd.__version__)
+    print("Arango: ", arango_version)
+    print("CSV: ", csv.__version__)
 
 # load config.yaml 
 def load_config() -> dict:
@@ -113,10 +118,6 @@ def start_db_admin(entities):
             print("SQL executed: {}, result is: {}".format(custom_sql, res_csv))
         elif user_choice == '4':
             create_user_schema()
-
-def show_environment():
-    print("Pandas: ", pd.__version__)
-    print("CSV: ", csv.__version__)
 
 config = load_config()
 db_name = config['database']['file_name']

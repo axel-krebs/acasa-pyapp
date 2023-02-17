@@ -21,8 +21,8 @@ DEFAULT_CONFIG = { # Defaults taken from Quart API
     "root_path": None
 }
 
-class ContextCache():
-    """
+class ContextCache(dict):
+    """_summary_
         This serves as a helper class to share a caching structure between modules 
         resp. between the Deployment class and the deployables; in the future, it 
         should be replaced by a caching framework resp. distributed cache. Like the
