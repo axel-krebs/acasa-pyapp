@@ -13,6 +13,7 @@ import output_management as OUTPUT_MGMT
 import order_management as ORDER_MGMT
 from acasa_admin.admin_gup import start_admin_app
 from db import create_proxy
+from web import Documentstore
 
 os.chdir(Path(__file__).parent)
 
@@ -85,6 +86,7 @@ def start_db_admin(entities):
         print("\t1. Initialize database (schema creation).")
         print("\t2. Load data from CSV.")
         print("\t3. Enter custom SQL.")
+        print("\t4. Create web db.")
         # get hold of DB controller (facade)
 
         user_choice = input("\t>")
@@ -109,10 +111,50 @@ def start_db_admin(entities):
             custom_sql = input("SQL>")
             res_csv = db_proxy._execute_sql(custom_sql)
             print("SQL executed: {}, result is: {}".format(custom_sql, res_csv))
+        elif user_choice == '4':
+            create_user_schema()
 
 def show_environment():
     print("Pandas: ", pd.__version__)
     print("CSV: ", csv.__version__)
+
+config = load_config()
+db_name = config['database']['file_name']
+db_path = os.path.join(os.path.dirname(__file__), db_name)
+db_proxy = create_proxy(db_path)
+
+def arango_client() -> ArangoClient:
+    arango_url = "http://{}:{}".format(config['arango']['host_name'], config['arango']['host_port']) # closure
+    return ArangoClient(arango_url)
+
+def document_store(): # closure
+    sys_db = arango_client().db('_system', username='root', password='Kerber0$')
+    db_name = config["arango"]["db_name"]
+    if not sys_db.has_database(db_name):
+        sys_db.create_database(db_name)
+    return arango_client().db(db_name, username=config["arango"]["app_user"], password=config["arango"]["app_password"])
+
+def create_user_schema(): 
+    acasa_db = document_store()
+    if acasa_db.has_collection('WebUsers'):
+        users = acasa_db.collection('WebUsers')
+    else:
+        users = acasa_db.create_collection('WebUsers')
+    users.add_hash_index(fields=['name'], unique=False)
+    users.truncate()
+    insert_test_user(users)
+    if acasa_db.has_collection('Translations'):
+        translations = acasa_db.collection('Translations')
+    else:
+        translations = acasa_db.create_collection('Translations')
+    load_translations(translations)
+    print("User schema created, tranlsations loaded.")
+
+def insert_test_user(user_coll):
+    return user_coll.insert({"Name": "Joe Doe", "Age": 35})
+
+def load_translations(transl_coll):
+    pass # TODO Find a way for not-programmers to enter translations easily..
 
 def print_menu():
     print()
@@ -140,11 +182,13 @@ def menu():
         elif user_choice == "dba":
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
-            from web import create_instance
+            from web import create_instance, ContextCache
+            from sample import create_deployment, AcasaWebStore
             WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, "acasa_web_1"))
-            web_inst_1 = create_instance(WEB_PATH)
-            from sample import create_deployment
-            deployment1 = create_deployment(db_proxy)
+            acasa_doc_store = AcasaWebStore(document_store())
+            ctx_cache = ContextCache()
+            web_inst_1 = create_instance(WEB_PATH, acasa_doc_store, ctx_cache)
+            deployment1 = create_deployment(db_proxy, ctx_cache)
             web_inst_1.deploy(deployment1)
             web_inst_1.start_server()
             # TODO Provide commands for controllers
@@ -157,15 +201,6 @@ def menu():
             OUTPUT_MGMT.print_receipt(order)
         else:
             print("You've entered an invalid choice.")
-
-config = load_config()
-db_name = config['database']['file_name']
-db_path = os.path.join(os.path.dirname(__file__), db_name)
-db_proxy = create_proxy(db_path)
-
-def arango_client():
-    arango_url = "http:{}:{}".format(config['arango']['host_name'], config['arango']['host_port']) # closure
-    return ArangoClient(arango_url)
 
 menu() # main()
 

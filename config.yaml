@@ -13,7 +13,7 @@ csv_files:
         - NAME
         - PRICE
         - CATEGORY_ID
-#    customers:
+#    customers: No! SEO forbode to save user data to SQLite!! Migrated to ArangoDB, s.b. 
 #        - ID
 #        - NAME
 #        - EMAIL
@@ -22,7 +22,7 @@ arango:
     host_name: localhost
     host_port: 8529
     db_name: acasa_db
-    app_user: acasa
+    app_user: acasa_pyapp
     app_password: Acasa#123
 messages: {
     "EN": {

@@ -1,4 +1,5 @@
 # Provide DB access for SQLite3 embedded database.
+from enum import Enum
 from pathlib import Path
 import sqlite3 
 
@@ -10,15 +11,13 @@ def singleton(cls): # PEP 318
         return instances[cls]
     return getinstance
 
-# Use enum instead? TODO
-# from enum import Enum
 class SQLCode():
     """_summary_
     Return object from execute stmt in SQL.
     """
     
-    def __init__(self, error):
-        self._err_object = error
+    def __init__(self, msg):
+        self._err_object = msg
 
     # Provide a 'to_string' method for error object
     def __str__(self) -> str:
@@ -28,6 +27,11 @@ class SQLCode():
         else: # assume err is string
             msg = self._err_object
         return msg
+
+class SQLCodes():
+    ERROR = SQLCode("General Error")
+    SUCCESS = SQLCode("Success!!")
+    WARN = SQLCode("General Warning!")
 
 @singleton
 class DbInstance:
@@ -59,7 +63,7 @@ class DbInstance:
         with self._TransactionalDbAccessor(conn) as cur:
             try: 
                 cur.execute(raw_sql)
-                return SQLCode("SUCCESS")
+                return SQLCodes.SUCCESS
             except sqlite3.DatabaseError as sql_ex:
                 return SQLCode(sql_ex)
     
