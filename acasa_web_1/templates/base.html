@@ -27,10 +27,8 @@
         </div>
         <div class="space-1">&nbsp;</div>
         <div class="menu-1 eingerueckt">
-            <h3>Menu</h3>
-            <!-- prod-by-cat is a Python dict -->
-            {% for cat in cache_data['cats'] %}
-                <a href="{{ cat }}">{{ cat }}</a>
+            {% for title_key in site_map %}
+                <a href="{{ site_map[title_key]['url'] }}">{{ title_key }}</a>
             {% endfor %}
         </div>
         <div class="section-1 abgedeckt eingerueckt">

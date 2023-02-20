@@ -13,7 +13,7 @@ import output_management as OUTPUT_MGMT
 import order_management as ORDER_MGMT
 from acasa_admin.admin_gup import start_admin_app
 from db import create_proxy
-from web import Documentstore
+from web import Documentstore # I/F
 
 os.chdir(Path(__file__).parent)
 
@@ -91,7 +91,7 @@ def start_db_admin(entities):
         print("\t1. Initialize database (schema creation).")
         print("\t2. Load data from CSV.")
         print("\t3. Enter custom SQL.")
-        print("\t4. Create web db.")
+        print("\t4. Create web db (users, translations).")
         # get hold of DB controller (facade)
 
         user_choice = input("\t>")
@@ -124,26 +124,34 @@ db_name = config['database']['file_name']
 db_path = os.path.join(os.path.dirname(__file__), db_name)
 db_proxy = create_proxy(db_path)
 
+# User database (Arango) #
+
 def arango_client() -> ArangoClient:
     arango_url = "http://{}:{}".format(config['arango']['host_name'], config['arango']['host_port']) # closure
     return ArangoClient(arango_url)
 
-def document_store(): # closure
-    sys_db = arango_client().db('_system', username='root', password='Kerber0$')
+def check_database_exists():
+    sys_db = arango_client().db('_system', username='root', password=config["arango"]["root_password"]) # closure
     db_name = config["arango"]["db_name"]
     if not sys_db.has_database(db_name):
         sys_db.create_database(db_name)
-    return arango_client().db(db_name, username=config["arango"]["app_user"], password=config["arango"]["app_password"])
+    return db_name
+
+def document_store():
+    user_db_name = check_database_exists()
+    return arango_client().db(user_db_name, username=config["arango"]["app_user"], password=config["arango"]["app_password"])
 
 def create_user_schema(): 
     acasa_db = document_store()
+    # 'WebUsers' collection
     if acasa_db.has_collection('WebUsers'):
         users = acasa_db.collection('WebUsers')
     else:
         users = acasa_db.create_collection('WebUsers')
-    users.add_hash_index(fields=['name'], unique=False)
-    users.truncate()
-    insert_test_user(users)
+        users.add_hash_index(fields=['name'], unique=False)
+        users.truncate()
+        insert_test_user(users)
+    # 'Translations' collection
     if acasa_db.has_collection('Translations'):
         translations = acasa_db.collection('Translations')
     else:
@@ -156,6 +164,21 @@ def insert_test_user(user_coll):
 
 def load_translations(transl_coll):
     pass # TODO Find a way for not-programmers to enter translations easily..
+
+# global cache is shared between dynamic web pages and RESTful web services #
+def init_cache(global_cache: dict, db_inst):
+    _PROD_SQL = """SELECT p.name AS product_name, 
+            p.price AS Product_price, 
+            c.name AS category_name 
+            FROM products p, categories c 
+            WHERE p.category_id = c.id"""
+    prods = db_inst.query(_PROD_SQL)
+    prods_by_cat = dict()
+    for p_name, p_price, p_category in prods:
+            if not p_category in prods_by_cat:
+                    prods_by_cat[p_category] = list()
+            prods_by_cat[p_category].append({"name": p_name, "price": p_price})
+    global_cache['prods'] = prods_by_cat # Cache all prods/categories in dict
 
 def print_menu():
     print()
@@ -184,12 +207,14 @@ def menu():
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
             from web import create_instance, ContextCache
-            from sample import create_deployment, AcasaWebStore
+            from sample import AcasaWebStore, create_deployment
             WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, "acasa_web_1"))
             acasa_doc_store = AcasaWebStore(document_store())
             ctx_cache = ContextCache()
+            init_cache(ctx_cache, db_proxy) # nsn.. inversion of control possible? should be on deployment time..
+            ctx_cache['user_settings'] = {}
             web_inst_1 = create_instance(WEB_PATH, acasa_doc_store, ctx_cache)
-            deployment1 = create_deployment(db_proxy, ctx_cache)
+            deployment1 = create_deployment(db_proxy)
             web_inst_1.deploy(deployment1)
             web_inst_1.start_server()
             # TODO Provide commands for controllers

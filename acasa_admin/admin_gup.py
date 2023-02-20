@@ -78,6 +78,7 @@ class AdminGUI(Frame):
         self.Bind(EVT_MENU, self.on_login, loginItem)
 
     def on_login(self, event):
+        self._login_dialog.CenterOnScreen()
         self._login_dialog.ShowModal()
 
     def on_exit(self, event):

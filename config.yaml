@@ -24,6 +24,7 @@ arango:
     db_name: acasa_db
     app_user: acasa_pyapp
     app_password: Acasa#123
+    root_password: Kerber0$
 messages: {
     "EN": {
         "what_to_order": "What do want to order? Enter a number from above.",
