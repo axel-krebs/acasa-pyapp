@@ -1,5 +1,4 @@
 # Provide DB access for SQLite3 embedded database.
-from enum import Enum
 from pathlib import Path
 import sqlite3 
 
@@ -34,7 +33,7 @@ class SQLCodes():
     WARN = SQLCode("General Warning!")
 
 @singleton
-class DbInstance:
+class DbInstance():
     """_summary_
         Encapsulate SQLite3 connections. 
         - Provide query methods
