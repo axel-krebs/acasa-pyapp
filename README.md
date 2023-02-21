@@ -1,5 +1,5 @@
 # acasa-pyapp
-<p> Example application using primarily Pathon constructs
+<p> Example application using primarily Python constructs
 
 <h3> Architecture </h3>
 

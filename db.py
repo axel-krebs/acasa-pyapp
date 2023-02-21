@@ -1,14 +1,7 @@
 # Provide DB access for SQLite3 embedded database.
 from pathlib import Path
 import sqlite3 
-
-def singleton(cls): # PEP 318
-    instances = {}
-    def getinstance(file_path):
-        if cls not in instances:
-            instances[cls] = cls(file_path)
-        return instances[cls]
-    return getinstance
+from util import *
 
 class SQLCode():
     """_summary_
@@ -18,7 +11,7 @@ class SQLCode():
     def __init__(self, msg):
         self._err_object = msg
 
-    # Provide a 'to_string' method for error object
+    # Provide a 'to_string' method for error object (logging!)
     def __str__(self) -> str:
         msg = ""
         if isinstance(self._err_object, sqlite3.DatabaseError):
@@ -28,13 +21,15 @@ class SQLCode():
         return msg
 
 class SQLCodes():
-    ERROR = SQLCode("General Error")
+    ERROR = SQLCode("General Error!")
     SUCCESS = SQLCode("Success!!")
     WARN = SQLCode("General Warning!")
 
+# TODO create SQLCode (with custom message) from enum (as I/F?)
+
 @singleton
 class DbInstance():
-    """_summary_
+    """
         Encapsulate SQLite3 connections. 
         - Provide query methods
         - Provide update methods
@@ -109,6 +104,7 @@ class DbInstance():
         """
         'Wrapper' around sqlite3 connection; to be used with 'with .. as'
         - mimic transactional behaviour: always committed at the end!
+        - Not a singleton - after all, we have control of this 'inner class'!
         """
 
         def __init__(self, conn):
@@ -129,3 +125,7 @@ class DbInstance():
 # utility
 def create_proxy(db_path: Path):
     return DbInstance(db_path) # creates new SQLite3 instance; however marked singleton..
+
+if __name__ == "__main__":
+    print("This is a library and cannot be invoked directly; pls. use 'import' fom another program.")
+    # raise error?

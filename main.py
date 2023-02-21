@@ -180,6 +180,20 @@ def init_cache(global_cache: dict, db_inst):
             prods_by_cat[p_category].append({"name": p_name, "price": p_price})
     global_cache['prods'] = prods_by_cat # Cache all prods/categories in dict
 
+def start_web_server():
+    from web import create_instance, ContextCache
+    from sample import AcasaWebStore, create_deployment
+    WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, "acasa_web_1"))
+    acasa_doc_store = AcasaWebStore(document_store())
+    ctx_cache = ContextCache()
+    init_cache(ctx_cache, db_proxy) # nsn.. inversion of control possible? should be on deployment time..
+    ctx_cache['user_settings'] = {}
+    web_inst_1 = create_instance(WEB_PATH, acasa_doc_store, ctx_cache)
+    deployment1 = create_deployment(db_proxy)
+    web_inst_1.deploy(deployment1)
+    web_inst_1.start_server()
+    # TODO Provide commands for controllers
+
 def print_menu():
     print()
     print("\tOptions: ")
@@ -206,18 +220,7 @@ def menu():
         elif user_choice == "dba":
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
-            from web import create_instance, ContextCache
-            from sample import AcasaWebStore, create_deployment
-            WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, "acasa_web_1"))
-            acasa_doc_store = AcasaWebStore(document_store())
-            ctx_cache = ContextCache()
-            init_cache(ctx_cache, db_proxy) # nsn.. inversion of control possible? should be on deployment time..
-            ctx_cache['user_settings'] = {}
-            web_inst_1 = create_instance(WEB_PATH, acasa_doc_store, ctx_cache)
-            deployment1 = create_deployment(db_proxy)
-            web_inst_1.deploy(deployment1)
-            web_inst_1.start_server()
-            # TODO Provide commands for controllers
+            start_web_server()
         elif user_choice == "gui":
             print("Opening admin GUI") # TODO log
             start_admin_app()
