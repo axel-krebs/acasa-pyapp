@@ -85,7 +85,7 @@ class Deployer():
 
         TODO: Flask knows about a 'Blueprint' concept, check whether that applies!
     """
-    def __init__(self, web_app: Quart, web_store: Documentstore):
+    def __init__(self, web_app: Quart):
         self._quart_inst = web_app # encapsulate for control via Deployer methods
     
     def deploy(self, d: Deployment):

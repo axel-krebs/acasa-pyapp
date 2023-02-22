@@ -233,11 +233,13 @@ def menu():
             from web import wrap_deployer
             from sample import create_deployment
             web_app = create_web_server()
-            runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
-            print("Running {}".format(runner))
+            # deployment maust come before starting the Quart instance!!
             deployer = wrap_deployer(web_app)
             deployment1 = create_deployment(db_proxy)
             deployer.deploy(deployment1)
+            # Running the ASGI runtime with uvicorn (should be similar to deploament on Heroku etc.)
+            runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
+            print("Running {}".format(runner))
         elif user_choice == "gui":
             print("Opening admin GUI") # TODO log
             start_admin_app()
