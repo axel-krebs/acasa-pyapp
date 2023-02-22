@@ -5,20 +5,20 @@ from arango import ArangoClient, version as arango_version
 import csv
 import errors as ERR
 import os
-import pandas as pd
 from pathlib import Path
+import uvicorn
 import yaml
 import license_management as L_M
 import output_management as OUTPUT_MGMT
 import order_management as ORDER_MGMT
 from acasa_admin.admin_gup import start_admin_app
 from db import create_proxy
-from web import Documentstore # I/F
 
 os.chdir(Path(__file__).parent)
 
 SCRIPT_PATH = Path(__name__).parent.resolve()
 SQL_PATH = Path("{}{}products_db.sql".format(SCRIPT_PATH, os.sep)) # hard-coded
+ACASA_WEB_1_DEPLOYMENT_FOLDER = "acasa_web_1"
 
 # Metadata for CSV-import files: attributes must be in the given list!
 # Format: {table_name => [attribute1, attribute2, etc.]}
@@ -179,20 +179,30 @@ def init_cache(global_cache: dict, db_inst):
                     prods_by_cat[p_category] = list()
             prods_by_cat[p_category].append({"name": p_name, "price": p_price})
     global_cache['prods'] = prods_by_cat # Cache all prods/categories in dict
+    global_cache['user_settings'] = {} # hmm...
 
-def start_web_server():
-    from web import create_instance, ContextCache
-    from sample import AcasaWebStore, create_deployment
-    WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, "acasa_web_1"))
+def create_web_server():
+    from web import create_instance, Documentstore, ContextCache
+    class AcasaWebStore(Documentstore): # class on-the-fly.. respect I/F!
+
+        def __init__(self, acasa_db):
+                self._db = acasa_db
+
+        def test_impl(self):
+                pass
+
+        def get_user_for_cookie(self, cookie):
+                self._db.aql.execute('FOR doc IN WebUsers RETURN doc')
+
+        def create_user(self, name: str = "", email: str = ""):
+                pass
+        
     acasa_doc_store = AcasaWebStore(document_store())
+    WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, ACASA_WEB_1_DEPLOYMENT_FOLDER))
     ctx_cache = ContextCache()
     init_cache(ctx_cache, db_proxy) # nsn.. inversion of control possible? should be on deployment time..
-    ctx_cache['user_settings'] = {}
     web_inst_1 = create_instance(WEB_PATH, acasa_doc_store, ctx_cache)
-    deployment1 = create_deployment(db_proxy)
-    web_inst_1.deploy(deployment1)
-    web_inst_1.start_server()
-    # TODO Provide commands for controllers
+    return web_inst_1 # Make this function executable by uvicorn for cloud deployment
 
 def print_menu():
     print()
@@ -220,7 +230,14 @@ def menu():
         elif user_choice == "dba":
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
-            start_web_server()
+            from web import wrap_deployer
+            from sample import create_deployment
+            web_app = create_web_server()
+            runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
+            print("Running {}".format(runner))
+            deployer = wrap_deployer(web_app)
+            deployment1 = create_deployment(db_proxy)
+            deployer.deploy(deployment1)
         elif user_choice == "gui":
             print("Opening admin GUI") # TODO log
             start_admin_app()

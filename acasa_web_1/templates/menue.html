@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-    {% for prod in prods %}
-    <div>{{ prod }}</div>
+    <h2>Menue: today</h2>
+    {% for cat_key in prods %}
+        <h3><u>{{ cat_key }}</u></h3>
+        <ol>
+        {% for prod in prods[cat_key] %}
+            <li>{{ prod['name'] }} ... {{ prod['price'] }} €</li>
+        {% endfor %}
+        </ol>
     {% endfor %}
 {% endblock %}

@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 from quart import Quart, session, render_template
 import random
-import uvicorn
 import yaml
 
 SCRIPT_PATH = Path(__name__).parent.resolve()
@@ -43,7 +42,7 @@ class ContextCache(dict):
 class Documentstore(ABC):
     """_summary_
         An "interface" for the injected document store, th. i. what the web app expects the underlying implementation 
-        to be able to deliver (JSON).
+        to be able to deliver (JSON-store); however, the implemetation can be what it wants to be as long as it delivers
     Args:
         ABC (_type_): _description_
     """
@@ -74,7 +73,7 @@ class Deployment(ABC):
     """
 
     @abstractmethod
-    def apply(rt: Quart, cache: ContextCache):
+    def apply(rt: Quart):
         raise NotImplementedError("Should not happen..")
 
 class Deployer():
@@ -86,40 +85,16 @@ class Deployer():
 
         TODO: Flask knows about a 'Blueprint' concept, check whether that applies!
     """
-    def __init__(self, web_app: Quart, config: dict, site_map: dict, web_store: Documentstore, global_cache: ContextCache):
+    def __init__(self, web_app: Quart, web_store: Documentstore):
         self._quart_inst = web_app # encapsulate for control via Deployer methods
-        self._host_name = config["host_name"]
-        self._port_number = config["host_port"]
-        self._ctx_cache = global_cache
-        self._site_map = site_map
-
-        # Apply the service stack: routing, security (login), header inspection, etc.
-
-        @self._quart_inst.route('/', methods=['GET', 'POST', 'PUT'])
-        async def index():
-            return await render_template(["index.html"], site_map=self._site_map) 
-        
-        #@quart_inst.before_request
-        #def make_session_permanent():
-        #    session.permanent = True
     
-    def debug(self):
-        self._quart_inst.run()
-
-    def start_server(self):
-        runner = uvicorn.run(self._quart_inst, host=self._host_name, port=self._port_number, log_level="info")
-        print("Running {}".format(runner))
-
-    def stop_server(self):
-        pass # TODO
-
     def deploy(self, d: Deployment):
         """_summary_
         Principally, a variant of "inversion of control" 
         Args:
             d (Deployment): _description_
         """
-        d.apply(self._quart_inst, self._ctx_cache)
+        d.apply(self._quart_inst)
 
 def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, global_cache: ContextCache = None) -> Deployer:
     """_summary_
@@ -166,16 +141,20 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, g
     root_package = os.path.basename(os.path.normpath(root_resolved))
     rp = importlib.import_module(root_package)
     site_map = rp.apply_routes(web_app, render_template, global_cache)
-    return Deployer(
-        web_app=web_app, 
-        config=config, 
-        site_map=site_map,
-        web_store=doc_store, 
-        global_cache=global_cache
-        )
+
+    _apply_configuration(web_app, config, doc_store)
+
+    return web_app
+
+# apply cross-cutting concerns, e.g. authentication against a database
+def _apply_configuration(web_app, config, app_store):
+    print("Applying the configuration  to the web_app instance..")
+
+def wrap_deployer(web_app):
+    return Deployer(web_app=web_app)
 
 # everything executed when module is imported (initialization)
 
 if __name__ == "__main__":
-    print("This is a library and cannot be invoked directly; pls. use 'import' fom another program.")
+    print("This is a library and cannot be invoked directly; pls. use 'import' from another program.")
     # raise error?

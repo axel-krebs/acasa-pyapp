@@ -2,26 +2,12 @@
 from web import Deployment, Documentstore, ContextCache
 from db import DbInstance
 
-class AcasaWebStore(Documentstore):
-
-        def __init__(self, acasa_db):
-                self._db = acasa_db
-
-        def test_impl(self):
-                pass
-
-        def get_user_for_cookie(self, cookie):
-                self._db.aql.execute('FOR doc IN WebUsers RETURN doc')
-    
-        def create_user(self, name: str = "", email: str = ""):
-                pass
-
 class SampleDeployment(Deployment):
 
         def __init__(self, db_inst: DbInstance):
                 self._db_inst = db_inst
           
-        def apply(self, asgi_RT, cache): # overridden
+        def apply(self, asgi_RT): # overridden
 
                 @asgi_RT.route('/products/')
                 async def list_products():
