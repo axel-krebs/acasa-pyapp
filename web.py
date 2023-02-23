@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import importlib
 import os
 from pathlib import Path
-from quart import Quart, session, render_template
+from quart import Quart, session, render_template, request
 import random
 import yaml
 
@@ -103,18 +103,22 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, g
         template_folder = template_path
     )
     
+    _apply_configuration(web_app, config, doc_store)
+
     # TODO this is just an intermediate solution: __init__.py cannot implement an I/F!
     root_package = os.path.basename(os.path.normpath(root_resolved))
     rp = importlib.import_module(root_package)
     site_map = rp.apply_routes(web_app, render_template, global_cache)
-
-    _apply_configuration(web_app, config, doc_store)
 
     return web_app
 
 # apply cross-cutting concerns, e.g. authentication against a database
 def _apply_configuration(web_app, config, app_store):
     print("Applying the configuration  to the web_app instance..")
+
+    #@web_app.route("/")
+    def check_cookie():
+        print("Req-Headers:", request.access_control_request_headers)
 
 # everything executed when module is imported (initialization)
 

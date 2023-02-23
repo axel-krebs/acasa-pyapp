@@ -3,6 +3,7 @@
 # Restaurant ACASA client utilities
 from arango import ArangoClient, version as arango_version
 import csv
+import datetime
 import errors as ERR
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ import license_management as L_M
 import output_management as OUTPUT_MGMT
 import order_management as ORDER_MGMT
 from acasa_admin.admin_gup import start_admin_app
-from db import create_proxy
+from db import create_proxy, DataObject
 
 os.chdir(Path(__file__).parent)
 
@@ -201,7 +202,46 @@ def create_web_server():
     ctx_cache = ContextCache()
     init_cache(ctx_cache, db_proxy) # nsn.. inversion of control possible? should be on deployment time..
     web_inst_1 = create_instance(WEB_PATH, acasa_doc_store, ctx_cache)
-    return web_inst_1 # Make this function executable by uvicorn for cloud deployment, e.g. Heroku
+    return web_inst_1, ctx_cache # Make this function executable by uvicorn for cloud deployment, e.g. Heroku
+
+# Depricated! TODO Introduce integration tests
+def start_order_management(config, lang, sql_db):
+    class DbMapper():
+        def __init__(self, db):
+            self._db_facade = db
+        def get_products(self):
+            _sql = """SELECT 
+                        p.id AS product_id,
+                        p.name AS product_name,
+                        p.price AS product_price,
+                        c.name AS category_name 
+                    FROM products p, categories c 
+                    WHERE p.category_id = c.id
+                    """
+            prods = self._db_facade.query(_sql)
+            prod_by_cat = dict()
+            for product_id, product_name, product_price, category_name in prods:
+                if not category_name in prod_by_cat:
+                    prod_by_cat[category_name] = list()
+                prod_by_cat[category_name].append({"id": product_id, "name": product_name, "price": product_price})
+            return prod_by_cat  # Automatic JSON converting! :-)
+    user_id = input("Pls. tell us your ID> ")
+    # TODO verify integrity of ID
+    order_items = ORDER_MGMT.take_order(config=config, language=lang, db_mapper=DbMapper(sql_db))
+    to_day = datetime.date.today()
+    order_obj = DataObject("orders", {"customer": user_id, "order_date": to_day})
+    order_id = sql_db.insert(order_obj)
+    for item in order_items:
+        amnt = order_items[item]
+        item_obj = DataObject("order_items", {"order_id": order_id, "item_id": item[2], "amount": amnt})
+        item_id = sql_db.insert(item_obj)
+
+    print()
+    print("Quittung")
+    sum_all = OUTPUT_MGMT.print_receipt(order_items)
+    print (f"Vielen Dank für Ihre Bestellung über {sum_all} € und auf Wiedersehen!")
+    # return anything?
+    return order_items
 
 def print_menu():
     print()
@@ -230,9 +270,9 @@ def menu():
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
             import sample
-            web_app = create_web_server()
+            web_app, ctx_cache = create_web_server()
             # deployment maust come before starting the Quart instance!!
-            sample.install_api(db_proxy, web_app)
+            sample.install_api(web_app, db_proxy, ctx_cache)
             # Running the ASGI runtime with uvicorn (should be similar to deploament on Heroku etc.)
             runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
             print("Running {}".format(runner))
@@ -241,19 +281,9 @@ def menu():
             start_admin_app()
         elif user_choice == "test":
             print("Starting order preview.")
-            order = start_order_management(config, ADMIN_LANGUAGE)
+            order = start_order_management(config, ADMIN_LANGUAGE, db_proxy)
             OUTPUT_MGMT.print_receipt(order)
         else:
             print("You've entered an invalid choice.")
 
 menu() # main()
-
-# Depricated! TODO Introduce integration tests
-def start_order_management(config, lang):
-    order = ORDER_MGMT.take_order(config, lang)
-    print()
-    print("Quittung")
-    sum_all = OUTPUT_MGMT.print_receipt(order)
-    print (f"Vielen Dank für Ihre Bestellung über {sum_all} € und auf Wiedersehen!")
-    # return anything?
-    return order

@@ -24,12 +24,11 @@ def print_menu(repertoire: dict, messages: dict, currency_symbol: str = "€") -
         for dish in repertoire[category]:
             dish_fomratted = "  {}. {} à {}/{}".format(dish["id"], dish["name"], str(dish["price"]) + currency_symbol, messages['msr'])
             print(dish_fomratted)
-            available_today[str(dish["id"])] = dish["name"], dish["price"] # For simplicity, fill the 'available' dict here..
-                                                                           # convert the id to string to avoid casting user input
-    print()
+            available_today[str(dish["id"])] = dish["name"], dish["price"] 
+            print()
     return available_today
 
-def take_order(config: dict, language: str = "DE") -> dict:
+def take_order(config: dict, language: str = "DE", db_mapper = None) -> dict:
     """Prints available items and takes user input.
 
     Args:
@@ -39,9 +38,10 @@ def take_order(config: dict, language: str = "DE") -> dict:
     Returns:
         dict: A list of ordered items with amount (dictionary).
     """
+    assert db_mapper is not None
     user_selection = {} # memoize user input, like {('Pizza Margerita',5.0,100):3} (3 = three pcs.)
     user_choice = '~upps!'
-    repertoire = config['repertoire']
+    repertoire = db_mapper.get_products()
     messages = config['messages'][language]
     avail = print_menu(repertoire, messages, currency_symbol = config['billing']['currency'])
     while True:

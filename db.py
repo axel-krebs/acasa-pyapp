@@ -25,8 +25,25 @@ class SQLCodes():
     SUCCESS = SQLCode("Success!!")
     WARN = SQLCode("General Warning!")
 
-# TODO create SQLCode (with custom message) from enum (as I/F?)
+# Minimal SQL mapper
+class DataObject():
+    def __init__(self, entitiy_name, col_values: dict) -> None:
+        self._entity_name = entitiy_name
+        self._attributes = col_values
+    
+    def generate_insert(self):
+        _res_sql = "INSERT INTO {} (".format(self._entity_name)
+        _res_sql += ",".join(self._attributes.keys())
+        _res_sql += ") VALUES ("
+        _res_sql += ",".join(['\'{}\''.format(val) for val in self._attributes.values()]) # simple string conversion
+        _res_sql += ");"
+        return _res_sql
+    
+    def generate_update(self):
+        pass
 
+    def generate_delete(self):
+        pass
 @singleton
 class DbInstance():
     """
@@ -61,6 +78,16 @@ class DbInstance():
             except sqlite3.DatabaseError as sql_ex:
                 return SQLCode(sql_ex)
     
+    def insert(self,data_object: DataObject):
+        conn = sqlite3.connect(self._db_file_path)
+        gen_sql = data_object.generate_insert()
+        with self._TransactionalDbAccessor(conn) as cur:
+            try: 
+                res = cur.execute(gen_sql)
+                return cur.lastrowid
+            except sqlite3.DatabaseError as sql_ex:
+                return SQLCode(sql_ex)
+
     # 'Facade' method: Creates SQL 'INSERT .. ON CONFLICT (..) DO UPDATE"
     def upsert(self, table: str, data_set: dict, key_field: str = "ID") -> SQLCode:
         keys = []
@@ -70,7 +97,7 @@ class DbInstance():
             values.append(data_set[attr_key]) 
         sql = "INSERT INTO " + table + "("
         sql += ",".join(keys)
-        sql += ") VALUES("
+        sql += ") VALUES ("
         sql += ",".join(values)
         sql += ") ON CONFLICT (id) DO UPDATE SET " # TODO: what if data_set was empty??
         cnt = 0 # needed for comma!

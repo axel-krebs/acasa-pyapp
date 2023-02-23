@@ -7,11 +7,12 @@ CREATE TABLE IF NOT EXISTS customers (
     email TEXT NOT NULL,
     pass_word TEXT NULL
 );
+**/
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER,
-    order_date DATE,
-    FOREIGN KEY (customer_id) REFERENCES customers(id)
+    customer TEXT NOT NULL, 
+    status INTEGER NOT NULL DEFAULT 0,
+    order_date DATE
 );
 CREATE TABLE order_items (
     order_id INTEGER,
@@ -21,7 +22,6 @@ CREATE TABLE order_items (
     FOREIGN KEY (item_id) REFERENCES products(id)
     PRIMARY KEY (order_id,item_id)
 );
-**/
 CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL

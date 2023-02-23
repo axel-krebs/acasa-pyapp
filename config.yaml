@@ -27,7 +27,7 @@ arango:
     root_password: Kerber0$
 messages: {
     "EN": {
-        "what_to_order": "What do want to order? Enter a number from above.",
+        "what_to_order": "What do you want to order? Pls. enter a number from above, or '0' when you're finished.",
         "msr": "pcs.",
         "how_many": "How many?",
         "unrecognized_input": "Leider haben wir keinen Übersetzer gefunden, der diese Anweisung überesetzen kann.."

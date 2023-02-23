@@ -1,5 +1,5 @@
 # Example web mapping
-from web import Documentstore, ContextCache
+from web import ContextCache
 from db import DbInstance
 
 
@@ -11,7 +11,7 @@ class Product():
     pass
 
 
-def install_api(db_instance, asgi_RT):
+def install_api(asgi_RT, db_instance: DbInstance, ctx_cache: ContextCache):
 
     @asgi_RT.route('/products/')
     async def list_products():
