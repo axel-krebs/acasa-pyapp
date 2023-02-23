@@ -9,7 +9,8 @@ site_map = {
 
 def apply_routes(asgi_RT, render_func, ctx_cache):
     """
-        Function must be names exactly like this!
+        Function signature must be exactly like this or els will not be invoked.
+        Comp. to 'init' functions in other environments..
     Args:
         asgi_RT (_type_): An ASGI runtime that provides a 'route' function
         render_func (_type_): A function capable to render a template.

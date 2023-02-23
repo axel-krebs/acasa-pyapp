@@ -25,7 +25,6 @@ ACASA_WEB_1_DEPLOYMENT_FOLDER = "acasa_web_1"
 CONFIG_FILE = Path("{}{}config.yaml".format(SCRIPT_PATH, os.sep))
 
 def show_environment():
-    print("Pandas: ", pd.__version__)
     print("Arango: ", arango_version)
     print("CSV: ", csv.__version__)
 
@@ -197,12 +196,12 @@ def create_web_server():
         def create_user(self, name: str = "", email: str = ""):
                 pass
         
-    acasa_doc_store = AcasaWebStore(document_store())
+    acasa_doc_store = AcasaWebStore(document_store()) # inject
     WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, ACASA_WEB_1_DEPLOYMENT_FOLDER))
     ctx_cache = ContextCache()
     init_cache(ctx_cache, db_proxy) # nsn.. inversion of control possible? should be on deployment time..
     web_inst_1 = create_instance(WEB_PATH, acasa_doc_store, ctx_cache)
-    return web_inst_1 # Make this function executable by uvicorn for cloud deployment
+    return web_inst_1 # Make this function executable by uvicorn for cloud deployment, e.g. Heroku
 
 def print_menu():
     print()
@@ -230,13 +229,10 @@ def menu():
         elif user_choice == "dba":
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
-            from web import wrap_deployer
-            from sample import create_deployment
+            import sample
             web_app = create_web_server()
             # deployment maust come before starting the Quart instance!!
-            deployer = wrap_deployer(web_app)
-            deployment1 = create_deployment(db_proxy)
-            deployer.deploy(deployment1)
+            sample.install_api(db_proxy, web_app)
             # Running the ASGI runtime with uvicorn (should be similar to deploament on Heroku etc.)
             runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
             print("Running {}".format(runner))

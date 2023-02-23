@@ -23,7 +23,7 @@ DEFAULT_CONFIG = { # Defaults taken from Quart API
 }
 
 class ContextCache(dict):
-    """_summary_
+    """
         This serves as a helper class to share a caching structure between modules 
         resp. between the Deployment class and the deployables; in the future, it 
         should be replaced by a caching framework resp. distributed cache. Like the
@@ -40,7 +40,7 @@ class ContextCache(dict):
         return self._protected_dict[key]
 
 class Documentstore(ABC):
-    """_summary_
+    """
         An "interface" for the injected document store, th. i. what the web app expects the underlying implementation 
         to be able to deliver (JSON-store); however, the implemetation can be what it wants to be as long as it delivers
     Args:
@@ -62,42 +62,8 @@ class Documentstore(ABC):
     def create_user(self, name: str = "", email: str = ""):
         raise NotImplementedError("Should not happen..")
 
-class Deployment(ABC):
-    """_summary_
-        An I/F for API deploments. 
-    Args:
-        ABC (_type_): _description_
-
-    Raises:
-        NotImplementedError: _description_
+def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, global_cache: ContextCache = None) -> Quart:
     """
-
-    @abstractmethod
-    def apply(rt: Quart):
-        raise NotImplementedError("Should not happen..")
-
-class Deployer():
-    """_summary_
-        Basically a wrapper around the Quart web app, with some convenience methods, e.g. 'start' 
-        or 'stop' the server resp. 'debug'. The name of the class comes from the fact that it has
-        a 'deploy' method, which shall be used to apply API methods, th.i. the connection between 
-        RESTful services and a database (not the Documentstore instance).
-
-        TODO: Flask knows about a 'Blueprint' concept, check whether that applies!
-    """
-    def __init__(self, web_app: Quart):
-        self._quart_inst = web_app # encapsulate for control via Deployer methods
-    
-    def deploy(self, d: Deployment):
-        """_summary_
-        Principally, a variant of "inversion of control" 
-        Args:
-            d (Deployment): _description_
-        """
-        d.apply(self._quart_inst)
-
-def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, global_cache: ContextCache = None) -> Deployer:
-    """_summary_
         A deployment must have a predefined structure, e.g. the config file must be named 'config.yaml' and must have an
         entry 'quart' etc.
     Args:
@@ -149,9 +115,6 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, g
 # apply cross-cutting concerns, e.g. authentication against a database
 def _apply_configuration(web_app, config, app_store):
     print("Applying the configuration  to the web_app instance..")
-
-def wrap_deployer(web_app):
-    return Deployer(web_app=web_app)
 
 # everything executed when module is imported (initialization)
 
