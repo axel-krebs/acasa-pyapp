@@ -51,8 +51,16 @@ class Documentstore(ABC):
         super().__init__()
 
     @abstractmethod
-    def test_impl(self):
-         raise NotImplementedError("Should not happen..")
+    def is_prepared(self):
+        """Return True if you want prepare() to be invoked. 
+        """
+        raise NotImplementedError("Should not happen..")
+    
+    @abstractmethod
+    def prepare(self):
+        """Callback: If is_prepared() returns False, this method will be invoked.
+        """
+        raise NotImplementedError("Should not happen..")
 
     @abstractmethod
     def get_user_for_cookie(self, cookie):
@@ -72,13 +80,18 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, g
         global_cache (ContextCache, optional): _description_. Defaults to None.
 
     Raises:
-        RuntimeError: _description_
+        RuntimeError: If no web database is provided.
 
     Returns:
-        Deployer: _description_
+        Quart: An ASGI runtime object to be deployed on a ASGI-compatible server, e.g. uvicorn. 
     """
-    if doc_store is None or doc_store.test_impl():
-        raise RuntimeError("The document store implementation is not valid!")
+    if doc_store is None:
+        raise RuntimeError("The document store must not be None!")
+    elif not doc_store.is_prepared():
+        doc_store.prepare()
+    else:
+        print("DocumentStore was existent and prepared.")
+
     if global_cache is None:
         global_cache = ContextCache()
 

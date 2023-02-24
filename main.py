@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import uvicorn
 import yaml
+# modules
 import license_management as L_M
 import output_management as OUTPUT_MGMT
 import order_management as ORDER_MGMT
@@ -117,7 +118,7 @@ def start_db_admin(entities):
             res_csv = db_proxy._execute_sql(custom_sql)
             print("SQL executed: {}, result is: {}".format(custom_sql, res_csv))
         elif user_choice == '4':
-            create_user_schema()
+            create_user_schema(document_store())
 
 config = load_config()
 db_name = config['database']['file_name']
@@ -141,8 +142,8 @@ def document_store():
     user_db_name = check_database_exists()
     return arango_client().db(user_db_name, username=config["arango"]["app_user"], password=config["arango"]["app_password"])
 
-def create_user_schema(): 
-    acasa_db = document_store()
+def create_user_schema(acasa_db): 
+
     # 'WebUsers' collection
     if acasa_db.has_collection('WebUsers'):
         users = acasa_db.collection('WebUsers')
@@ -151,6 +152,7 @@ def create_user_schema():
         users.add_hash_index(fields=['name'], unique=False)
         users.truncate()
         insert_test_user(users)
+
     # 'Translations' collection
     if acasa_db.has_collection('Translations'):
         translations = acasa_db.collection('Translations')
@@ -168,8 +170,8 @@ def load_translations(transl_coll):
 # global cache is shared between dynamic web pages and RESTful web services #
 def init_cache(global_cache: dict, db_inst):
     _PROD_SQL = """SELECT p.name AS product_name, 
-            p.price AS Product_price, 
-            c.name AS category_name 
+                p.price AS Product_price, 
+                c.name AS category_name 
             FROM products p, categories c 
             WHERE p.category_id = c.id"""
     prods = db_inst.query(_PROD_SQL)
@@ -188,8 +190,12 @@ def create_web_server():
         def __init__(self, acasa_db):
                 self._db = acasa_db
 
-        def test_impl(self):
-                pass
+        def is_prepared(self):
+                return False # Calls prepare(), s.b.
+
+        def prepare(self):
+            create_user_schema(self._db) # s.a.
+            return self
 
         def get_user_for_cookie(self, cookie):
                 self._db.aql.execute('FOR doc IN WebUsers RETURN doc')
@@ -206,9 +212,11 @@ def create_web_server():
 
 # Depricated! TODO Introduce integration tests
 def start_order_management(config, lang, sql_db):
-    class DbMapper():
+    class ProductDbMapper():
+
         def __init__(self, db):
             self._db_facade = db
+
         def get_products(self):
             _sql = """SELECT 
                         p.id AS product_id,
@@ -225,9 +233,11 @@ def start_order_management(config, lang, sql_db):
                     prod_by_cat[category_name] = list()
                 prod_by_cat[category_name].append({"id": product_id, "name": product_name, "price": product_price})
             return prod_by_cat  # Automatic JSON converting! :-)
+        
     user_id = input("Pls. tell us your ID> ")
     # TODO verify integrity of ID
-    order_items = ORDER_MGMT.take_order(config=config, language=lang, db_mapper=DbMapper(sql_db))
+    order_items = ORDER_MGMT.take_order(config=config, language=lang, db_mapper=ProductDbMapper(sql_db))
+    # Save order to DB:
     to_day = datetime.date.today()
     order_obj = DataObject("orders", {"customer": user_id, "order_date": to_day})
     order_id = sql_db.insert(order_obj)

@@ -8,6 +8,7 @@ def make_login_dialog(root):
     _ld = Dialog(root)
     # Add controls
     return _ld
+
 class AdminGUI(Frame):
     
     def __init__(self, *args, **kw):
