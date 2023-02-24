@@ -1,15 +1,23 @@
 # Example web mapping
 from web import ContextCache
-from db import DbInstance
+from db import *
 
+@PersistenceCapable("categories")
+class Category(object):
+    id: Column.INTEGER
+    name: Column.VARCHAR
 
-class Category():
-    pass
+    def __init__(self) -> None:
+        print("Regular invokation!")
 
+cat1 = Category()
 
-class Product():
-    pass
-
+@PersistenceCapable(table_name="products")
+class Product:
+    id: int
+    name: str
+    price: float
+    category: Category
 
 def install_api(asgi_RT, db_instance: DbInstance, ctx_cache: ContextCache):
 

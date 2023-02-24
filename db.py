@@ -1,4 +1,6 @@
 # Provide DB access for SQLite3 embedded database.
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 import sqlite3 
 from util import *
@@ -25,7 +27,35 @@ class SQLCodes():
     SUCCESS = SQLCode("Success!!")
     WARN = SQLCode("General Warning!")
 
-# Minimal SQL mapper
+class Column(Enum):
+    INTEGER = int
+    VARCHAR = str
+
+# Python Data Object. Comp. JDO: "Entity"; 
+class PersistenceCapable(object):
+    """Such annotated classes can be persisted to the database table provided as entity name.
+    """
+    def __init__(self, table_name): # Evaluate decorator arguments
+        self._table_name = table_name
+        self._persistence_status = 0 # ?
+
+    def __call__(self, cls): # decorated class instantiation
+        print('__call__', cls)
+        # TODO "enhance" cls, th.i inspect attributes
+        return cls
+
+class PersistenceManager: # Draft
+    """Obtain a manager for PersistenceCapable objects
+    """
+    def __init__(self, db_instance):
+        self._db_manager = db_instance
+
+    def persist(self, pc: PersistenceCapable):
+        pass
+
+
+
+# Minimal SQL mapper; only temporary usage! TBR by "PersistenceCapable", s.a. 
 class DataObject():
     def __init__(self, entitiy_name, col_values: dict) -> None:
         self._entity_name = entitiy_name
@@ -147,7 +177,6 @@ class DbInstance():
         def __exit__(self, type, value, traceback):
             self._cursor.close()
             self._conn.commit()
-
 
 # utility
 def create_proxy(db_path: Path):
