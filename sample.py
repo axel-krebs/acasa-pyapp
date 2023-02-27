@@ -2,22 +2,29 @@
 from web import ContextCache
 from db import *
 
-@PersistenceCapable("categories")
-class Category(object):
-    id: Column.INTEGER
-    name: Column.VARCHAR
+# 'Domain objects'
+@PersistenceCapable(table_name="categories")
+class Category():
 
-    def __init__(self) -> None:
-        print("Regular invokation!")
+    @Column(col_name="id", sql_type=ColumnTypes.INTEGER)
+    def _id(self) -> int: 0
 
-cat1 = Category()
+    @Column(col_name="name", sql_type=ColumnTypes.TEXT)
+    def _name(self) -> str: ""
 
-@PersistenceCapable(table_name="products")
-class Product:
-    id: int
+@PersistenceCapable()
+class Products():
+    
+    @Column()
+    def id() -> int: 0
+
     name: str
     price: float
     category: Category
+
+cat1 = Category("Drinks")
+cat1._name = "Drinks"
+what = cat1._name
 
 def install_api(asgi_RT, db_instance: DbInstance, ctx_cache: ContextCache):
 
@@ -41,7 +48,6 @@ def install_api(asgi_RT, db_instance: DbInstance, ctx_cache: ContextCache):
 
 if __name__ == "__main__":
     print("This is a deployment unit and cannot be run directly! Usage:")
-    print("""from sample import create_deployment
-             deployment1 = create_deployment(db_proxy)
-             web_inst_1.deploy(deployment1)
+    print("""from sample import install_api
+             install_api(web_instance, db_proxy, ctx_cache)
           """)

@@ -127,21 +127,32 @@ db_proxy = create_proxy(db_path)
 
 # User database (Arango) #
 
-def arango_client() -> ArangoClient:
+def arango_client(timeout: int = 12, max_retries: int = 3) -> ArangoClient:
     arango_url = "http://{}:{}".format(config['arango']['host_name'], config['arango']['host_port']) # closure
-    return ArangoClient(arango_url)
+    arango_client = ArangoClient(arango_url)
+    arango_client.request_timeout = timeout
+    return arango_client
 
 def check_database_exists():
-    sys_db = arango_client().db('_system', username='root', password=config["arango"]["root_password"]) # closure
-    db_name = config["arango"]["db_name"]
-    if not sys_db.has_database(db_name):
-        sys_db.create_database(db_name)
-    return db_name
+    try:
+        sys_db = arango_client().db('_system', username='root', password=config["arango"]["root_password"]) # closure
+        db_name = config["arango"]["db_name"]
+        if not sys_db.has_database(db_name):
+            sys_db.create_database(db_name)
+    except ConnectionAbortedError as CAE:
+        print("Connection not possible! Have you started the server?")
+    else:
+        return db_name
 
 def document_store():
     user_db_name = check_database_exists()
-    return arango_client().db(user_db_name, username=config["arango"]["app_user"], password=config["arango"]["app_password"])
-
+    if user_db_name == config["arango"]["db_name"]:
+        return arango_client().db(user_db_name, 
+                                  username=config["arango"]["app_user"], 
+                                  password=config["arango"]["app_password"])
+    else:
+        raise RuntimeError("Couldn't get a handle to the document store!")
+    
 def create_user_schema(acasa_db): 
 
     # 'WebUsers' collection
@@ -187,7 +198,7 @@ def create_web_server():
     from web import create_instance, Documentstore, ContextCache
     class AcasaWebStore(Documentstore): # class on-the-fly.. respect I/F!
 
-        def __init__(self, acasa_db):
+        def __init__(self, acasa_db: ArangoClient, needs_initialization: bool):
                 self._db = acasa_db
 
         def is_prepared(self):
@@ -203,7 +214,7 @@ def create_web_server():
         def create_user(self, name: str = "", email: str = ""):
                 pass
         
-    acasa_doc_store = AcasaWebStore(document_store()) # inject
+    acasa_doc_store = AcasaWebStore(document_store(), True) # inject
     WEB_PATH = Path("{}{}{}".format(SCRIPT_PATH, os.sep, ACASA_WEB_1_DEPLOYMENT_FOLDER))
     ctx_cache = ContextCache()
     init_cache(ctx_cache, db_proxy) # nsn.. inversion of control possible? should be on deployment time..
@@ -281,7 +292,7 @@ def menu():
         elif user_choice == "web":
             import sample
             web_app, ctx_cache = create_web_server()
-            # deployment maust come before starting the Quart instance!!
+            # deployment must come before starting the Quart instance!!
             sample.install_api(web_app, db_proxy, ctx_cache)
             # Running the ASGI runtime with uvicorn (should be similar to deploament on Heroku etc.)
             runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
