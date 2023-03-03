@@ -1,11 +1,9 @@
 # Provide DB access for SQLite3 embedded database.
-from abc import ABC
-from dataclasses import dataclass
+from abc import *
 from enum import Enum
 from pathlib import Path
 from inspect import *
 import sqlite3
-import sys
 from typing import Any
 from util import *
 
@@ -34,8 +32,7 @@ class SQLCodes():
     WARN = SQLCode("General Warning!")
 
 
-# At a first shot, these are SQLite data types ONLY..
-class ColumnTypes(Enum):
+class ColumnTypes(Enum):  # At a first shot, these are SQLite data types ONLY..
     INTEGER = int
     REAL = float
     TEXT = str
@@ -44,60 +41,174 @@ class ColumnTypes(Enum):
 
 
 class ImproperUsageException(RuntimeError):
+    """Raised when a decorator is applied to the wrong type, e.g. a @PersistenceCapable to a function (instead of a 
+    class) or a @Column to a class instead of a function.
+
+    Args:
+        RuntimeError (_type_): _description_
+    """
+
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
 
 class InvalidConfigurationWarning(Warning):
+    """Raised when an invalid configuration is detected, e.g. a @PersistenceCapable class without columns.
+
+    Args:
+        Warning (_type_): _description_
+    """
+
     def __init__(self, *args: object) -> None:
         super().__init__(*args)
 
 
-pcc_registry = dict()  # persistence capable class registry
-# Work-around: During import, instantiation of PersistenceCapable and Column is detached
+# The registry;
+# Format: {
+#   "class_fqdn": module.Class,
+#   "class_members": [
+#       {
+#           "column_name": name,
+#           "column_type": sql_type,
+#           "default_value": value,
+#           "py_func": name_of_the_original_function
+#       }
+#   ]
+# }
+pcc_registry = dict()  # persistence capable class registry; naming resp. QL for querying
+
+# Work-around: During import, instantiation of PersistenceCapable and Column is detached; this "tray" serves as sharing
 _class_parsing_tray = {}
 
 # "Python Data Object", comp. JDO: "PersistenceCapable"; necessary b. Entity does not provide a mapping to a the name of
 # a table in the database.
 
 
-class PersistenceCapable():
+def save(self):
+    print("Saving self..")
+
+
+def load(self, key):
+    print("Loading self, key", key)
+
+
+def delete(self):
+    print("Deleting self")
+
+
+class _PersistenceCapable():
+
+    @abstractmethod
+    def load(clz, key):
+        print("Abstract Loading..", key)
+
+    @abstractmethod
+    def save(clz):
+        print("Abstract Saving..")
+
+    @abstractmethod
+    def delete(clz):
+        print("Abstract Deleting..")
+
+
+class PersistenceCapable(_PersistenceCapable):
     """Such annotated classes can be persisted to a database table.
     """
 
-    def __init__(self, table_name: str = None):  # Evaluate decorator arguments
+    # Evaluate decorator arguments; self = PersistenceCapable
+    def __init__(self, table_name: str = None):
         if table_name is None:
             _class_parsing_tray['table_name'] = False
         else:
             _class_parsing_tray['table_name'] = table_name
         _class_parsing_tray['table_columns'] = []
 
-    def __call__(self, cls):  # decorated class instantiation (import time); attention: called last in the import chain!
-        # Therefore, only checks should be made here that everything went right during registration and the class then
-        # added to the pcc_registry
-        print('__call__', cls)
-        if isfunction(cls):
-            raise ImproperUsageException(
-                "PersistenceCapable must be applied to a class, not a function.")
-        elif isclass(cls):
-            mbrs = getmembers(cls)
-            print("Members: ", mbrs)
-        # Check _class_parsing_tray; att. __call__ is invoked at import time as well as runtime, e.g. object creation
-        global _class_parsing_tray
-        if len(_class_parsing_tray) != 0:
-            if not _class_parsing_tray['table_columns']:
-                raise InvalidConfigurationWarning(
-                    "No columns have been found in the data class.")
-            pcc_registry[self] = _class_parsing_tray.copy()
-            # When this 'constructor' of the class is called, the members (if any) must have been registered already!
-            _class_parsing_tray = {}  # reset
+    # decorated class instantiation (import time); Attention: called last in the import
+    def __call__(self, *args):
+        # chain! Therefore, only checks should be made here that everything went right during registration and the class
+        # afterwards added to the pcc_registry
+        print('__call__', args)
+
+        # Should not happen (_Entity returned)
+        if args is None or len(args) == 0:
+            raise ImproperUsageException("Constructor with no-args invoked - this should not happen.")
+
+        else:
+            first_arg = args[0]
+            if isfunction(first_arg):
+                raise ImproperUsageException(
+                    "Decorator @PersistenceCapable must be applied to a class, not a function!")
+
+            # Handle import-time construction
+            elif isclass(first_arg):
+                clz = first_arg
+                clz_name = clz.__qualname__
+                clz_mod_name = clz.__module__
+                clz_qname = clz_mod_name + "." + clz_name
+                clz_props = {}
+
+                # Check _class_parsing_tray; __call__() is invoked at "import time" as well as runtime, e.g. object creation
+                global _class_parsing_tray
+                if len(_class_parsing_tray) != 0:  # Initialization phase (import time)
+
+                    # No @Column functions detected
+                    if not _class_parsing_tray['table_columns']:
+                        raise InvalidConfigurationWarning(
+                            "No @Column definitions have been found in the data class!")
+
+                    # "Monkey-wrapping"..
+                    ent = _Entity(clz, _class_parsing_tray['table_columns'])
+
+                    # Register parsing results
+                    pcc_registry[clz_qname] = clz_props
+
+                    #  Reset the tray for next class, if any
+                    _class_parsing_tray = {}  # reset
+
+                    return ent
+
+                else:
+                    raise "Class-parsing error at import time: tray was empty."
+
+            else:
+                raise ImproperUsageException(
+                    "@PersistenceCapable not defined for class!")
+
+        return self # should not happen
+
+
+class _Entity(_PersistenceCapable):
+
+    def __init__(self, cls):
+        pass
+
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        print("Ctor on entity called!")
         return self
+
+    # def __setattr__(self, __name: str, __value: Any) -> None:
+    #     print("setattr() on PersistenceCapable called! name: ",
+    #           __name, ", value: ", __value)
+
+    # def __getattribute__(self, __name: str) -> Any:
+    #     print("getattribute on PersistenceCapable called! name: ", __name)
+
+    def load(clz, key):
+        print("Loading entity..", key)
+        return clz
+
+    def save(clz):
+        print("Saving entity..")
+        return clz
+
+    def delete(clz):
+        print("Deleting entity..")
 
 
 def infer_sqltype_from_python(t: type = None):
     if t is None:
         raise InvalidConfigurationWarning(
-            "Tried to infer SQL type from Python return value, but None given.")
+            "Tried to infer SQL type from Python return value, but None type given.")
     # match stmt not feasible in Python 3.9!
     elif t == str:
         return ColumnTypes.TEXT
@@ -108,9 +219,17 @@ def infer_sqltype_from_python(t: type = None):
     elif t == object:
         return ColumnTypes.BLOB
     else:
-        return ColumnTypes.NULL # ?
+        return ColumnTypes.NULL  # ?
+
 
 def Column(col_name: str = None, sql_type: ColumnTypes = None):
+    """Define a persistent field. Comp. to standard @property decorator.
+
+    Args:
+        col_name (str, optional): _description_. Defaults to None.
+        sql_type (ColumnTypes, optional): _description_. Defaults to None.
+    """
+
     def _deco(self):  # self is class method? Check!
         if not isfunction(self):
             raise ImproperUsageException("""A Column decorator must be annotated within a class method, e.g.\n\
@@ -129,6 +248,9 @@ def Column(col_name: str = None, sql_type: ColumnTypes = None):
             raise ImproperUsageException(
                 "@Column can only be added to class methods!")
 
+        self_sig = signature(self)
+        self_src = getsource(self)
+        self_value = self()  # simplest way to inspect the return value of this function!
         # Because PersistenceCapable does not know about the class, this must be done on occurrence of first @Column tag
         fqdn = mod_name + "." + class_name
         if 'fq_class_name' not in _class_parsing_tray:
@@ -146,19 +268,30 @@ def Column(col_name: str = None, sql_type: ColumnTypes = None):
         # resp. return value annotation.
         nonlocal col_name, sql_type
         if col_name is None:
-            col_name = func_name
+            col_name = func_name  # name of function will be name of column
         if sql_type is None:
             try:
-                ret_val = self.__annotations__['return']
+                ret_val = self.__annotations__[
+                    'return']  # maybe empty -> exception
                 sql_type = infer_sqltype_from_python(
                     ret_val)  # raises exception
             except Exception as ex:
                 raise InvalidConfigurationWarning("@Column decorator has no sql_type specified, and none return \
                                                   annotation given.", ex)
+
         _class_parsing_tray['table_columns'].append(
-            {"col_name": col_name, "sql_type": sql_type, "class_method": func_name})
+            {"class_prop": func_name, "column_name": col_name, "column_type": sql_type, "default_value": self_value})
 
     return _deco
+
+
+class JoinType(Enum):
+    LEFT = "left",
+    RIGHT = "right"
+
+
+def Join(join_type: JoinType):
+    pass
 
 
 class Query:

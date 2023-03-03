@@ -3,28 +3,57 @@ from web import ContextCache
 from db import *
 
 # 'Domain objects'
+
+
 @PersistenceCapable(table_name="categories")
 class Category():
 
     @Column(col_name="id", sql_type=ColumnTypes.INTEGER)
-    def _id(self) -> int: 0
+    def id() -> int:
+        return 0  # "0" will be the default value
 
     @Column(col_name="name", sql_type=ColumnTypes.TEXT)
-    def _name(self) -> str: ""
+    def name() -> str:  # Function name will be replaced, as well as return value type
+        print("Hallo")  # Will be discarded!
+        # return "" - implicit!
 
-@PersistenceCapable()
-class Products():
-    
+
+@PersistenceCapable("products") # Another format for table_name argument
+class Product():
+
     @Column()
-    def id() -> int: 0
+    def id() -> int: 
+        return 0.0
 
-    name: str
-    price: float
-    category: Category
+    @Column()
+    def name() -> str: 
+        return ""
 
-cat1 = Category("Drinks")
-cat1._name = "Drinks"
-what = cat1._name
+    @Column()
+    def price() -> float:
+        return 0.0
+
+    #@Join(join_type=JoinType.LEFT)
+    @Column()
+    def category() -> Category: 
+        return None
+
+
+cat1 = Category(name="Pasta")
+#what = cat1.name
+#print(what)
+
+cat2 = Category()
+cat1.name = "Drinks"
+
+# I have a key, pls. load the product
+p1 = Product.load(1)
+#p1.price = 5.99
+p1.save()
+
+pizza_margerita = Product()
+pizza_margerita.price = 4.99
+pizza_margerita.save()
 
 def install_api(asgi_RT, db_instance: DbInstance, ctx_cache: ContextCache):
 
