@@ -127,7 +127,7 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: Documentstore = None, g
 
 # apply cross-cutting concerns, e.g. authentication against a database
 def _apply_configuration(web_app, config, app_store):
-    print("Applying the configuration  to the web_app instance..")
+    print("Applying the configuration  to the web_app instance.. (TODO)")
 
     #@web_app.route("/")
     def check_cookie():

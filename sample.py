@@ -5,6 +5,7 @@ from db import *
 # 'Domain objects'
 
 
+# "table_name" MUST be a keyword-based parameter, otherwise the "normal" ctor of the class will not be working!s
 @PersistenceCapable(table_name="categories")
 class Category():
 
@@ -17,43 +18,50 @@ class Category():
         print("Hallo")  # Will be discarded!
         # return "" - implicit!
 
+    # Make sure that custom class methods won't get lost when class is "decorated"..
+    def custom_method(self):
+        print("Method without decorator invoked, value of name2:",
+              self.name2)  # attribute correctly set??
 
-@PersistenceCapable("products") # Another format for table_name argument
+
+@PersistenceCapable(table_name="products")
 class Product():
 
-    @Column()
-    def id() -> int: 
+    @Column() # colummn name inferred from method signature
+    def id() -> int:
         return 0.0
 
     @Column()
-    def name() -> str: 
+    def name() -> str:
         return ""
 
     @Column()
     def price() -> float:
         return 0.0
 
-    #@Join(join_type=JoinType.LEFT)
+    # @Join(join_type=JoinType.LEFT)
     @Column()
-    def category() -> Category: 
+    def category() -> Category:
         return None
 
 
-cat1 = Category(name="Pasta")
-#what = cat1.name
-#print(what)
+cat2 = Category("Holla")
+cat2.name = "Drinks"
+print(cat2.name)
+cat2.name2 = "Drink$_2"  # Additional attributes allowed, though not nice..
+cat2.custom_method()
 
-cat2 = Category()
-cat1.name = "Drinks"
+Category.findAll()
 
 # I have a key, pls. load the product
 p1 = Product.load(1)
 #p1.price = 5.99
 p1.save()
 
-pizza_margerita = Product()
+pizza_margerita = Product("Pizza Margerita")
 pizza_margerita.price = 4.99
 pizza_margerita.save()
+
 
 def install_api(asgi_RT, db_instance: DbInstance, ctx_cache: ContextCache):
 

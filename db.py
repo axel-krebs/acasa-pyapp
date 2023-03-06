@@ -77,61 +77,84 @@ class InvalidConfigurationWarning(Warning):
 # }
 pcc_registry = dict()  # persistence capable class registry; naming resp. QL for querying
 
-# Work-around: During import, instantiation of PersistenceCapable and Column is detached; this "tray" serves as sharing
+# Work-around: During import, instantiation of PersistenceCapable and Column is detached; this "tray" serves for sharing
 _class_parsing_tray = {}
 
 # "Python Data Object", comp. JDO: "PersistenceCapable"; necessary b. Entity does not provide a mapping to a the name of
 # a table in the database.
 
 
-def save(self):
-    print("Saving self..")
-
-
-def load(self, key):
-    print("Loading self, key", key)
-
-
-def delete(self):
-    print("Deleting self")
-
-
 class _PersistenceCapable():
 
     @abstractmethod
-    def load(clz, key):
-        print("Abstract Loading..", key)
+    def save():
+        raise "Should never be invoked directly (abstract)!"
 
     @abstractmethod
-    def save(clz):
-        print("Abstract Saving..")
+    def delete():
+        raise "Should never be invoked directly (abstract)!"
 
-    @abstractmethod
-    def delete(clz):
-        print("Abstract Deleting..")
+
+def save(obj):
+    """Method attached to persistent objects. Make sure, a entity manager instance is available, wehn invoking this fct.
+
+    Args:
+        obj (_type_): Implicit instance
+    """
+    print("Saving object..")
+
+
+def delete(obj):
+    """Method attached to persistent objects. Make sure, a entity manager instance is available, wehn invoking this fct.
+
+    Args:
+        obj (_type_): Implicit instance
+    """
+    print("Deleting object..")
+
+# Property descriptor for persistent attributes
+
+
+class _GetterSetter():
+    def __init__(self, value: Any = None) -> None:
+        self._v = value
+
+    def __get__(self, instance, owner) -> Any:
+        if instance is None:
+            return self
+        return self._v
+
+    def __set__(self, instance, value) -> None:
+        self._v = value
 
 
 class PersistenceCapable(_PersistenceCapable):
-    """Such annotated classes can be persisted to a database table.
+    """Use as decorator. Such decorated classes can be persisted to a database table, s. attached methods (class or 
+       instance).
     """
 
-    # Evaluate decorator arguments; self = PersistenceCapable
-    def __init__(self, table_name: str = None):
-        if table_name is None:
-            _class_parsing_tray['table_name'] = False
-        else:
-            _class_parsing_tray['table_name'] = table_name
-        _class_parsing_tray['table_columns'] = []
+    # Evaluate decorator arguments; self = PersistenceCapable; attention: since __call__ on ctor returns the mixin; this
+    # will be also invoked when an object of the original class is created!
+    def __init__(self, *ctor_args, **kwargs):
+        # super().__init__(**kwargs)
+        if ctor_args:
+            print("Don't know what to do with nameless parameters..")
+        elif kwargs:  # invoked on import-time by decorator; noly possible parameter is "table_name":
+            table_name = kwargs["table_name"]
+            if table_name:
+                _class_parsing_tray['table_name'] = table_name
+                _class_parsing_tray['table_columns'] = []
+            else:
+                print("TODO: set named parameters as attributes")
 
-    # decorated class instantiation (import time); Attention: called last in the import
+    # Decorated class instantiation (import time); Attention: called last after Column, Join etc. have been called..
+    # Therefore, only checks should be made here that everything went right during registration and decorated members
+    # have been registered orderly.
     def __call__(self, *args):
-        # chain! Therefore, only checks should be made here that everything went right during registration and the class
-        # afterwards added to the pcc_registry
-        print('__call__', args)
 
-        # Should not happen (_Entity returned)
         if args is None or len(args) == 0:
-            raise ImproperUsageException("Constructor with no-args invoked - this should not happen.")
+            raise ImproperUsageException(
+                "Constructor with no-args invoked - this should not happen.")
 
         else:
             first_arg = args[0]
@@ -147,17 +170,34 @@ class PersistenceCapable(_PersistenceCapable):
                 clz_qname = clz_mod_name + "." + clz_name
                 clz_props = {}
 
-                # Check _class_parsing_tray; __call__() is invoked at "import time" as well as runtime, e.g. object creation
+                # Check _class_parsing_tray; __call__() is invoked at "import time",
                 global _class_parsing_tray
                 if len(_class_parsing_tray) != 0:  # Initialization phase (import time)
 
                     # No @Column functions detected
                     if not _class_parsing_tray['table_columns']:
                         raise InvalidConfigurationWarning(
-                            "No @Column definitions have been found in the data class!")
+                            "No @Column definitions found in the persistent class!")
 
-                    # "Monkey-wrapping"..
-                    ent = _Entity(clz, _class_parsing_tray['table_columns'])
+                    # Extend the given class with I/F methods
+                    clz_base = clz.__base__
+                    # No, assume NO ONHERITANCE for PersistenceCapable; maybe later..
+                    clz_base_name = clz_base.__name__
+
+                    # Extend type with THIS as a mixin
+                    try:
+                        clz = type(clz_name, (PersistenceCapable,
+                                              clz_base), dict(clz.__dict__))
+                    except TypeError as typEx:
+                        raise ImproperUsageException(
+                            "PersistenceCapable-decorated classes may not inherit (s. Release)")
+
+                    setattr(clz, "save", save)
+                    setattr(clz, "delete", delete)
+
+                    for col_def in _class_parsing_tray["table_columns"]:
+                        setattr(clz, col_def["class_prop"], _GetterSetter(
+                            col_def["default_value"]))
 
                     # Register parsing results
                     pcc_registry[clz_qname] = clz_props
@@ -165,47 +205,32 @@ class PersistenceCapable(_PersistenceCapable):
                     #  Reset the tray for next class, if any
                     _class_parsing_tray = {}  # reset
 
-                    return ent
+                    return clz
 
                 else:
                     raise "Class-parsing error at import time: tray was empty."
 
             else:
                 raise ImproperUsageException(
-                    "@PersistenceCapable not defined for class!")
+                    "@PersistenceCapable must be used with a class.")
 
-        return self # should not happen
+        return self  # should not happen! Raise exception?
 
-
-class _Entity(_PersistenceCapable):
-
-    def __init__(self, cls):
-        pass
-
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        print("Ctor on entity called!")
-        return self
-
-    # def __setattr__(self, __name: str, __value: Any) -> None:
-    #     print("setattr() on PersistenceCapable called! name: ",
-    #           __name, ", value: ", __value)
-
-    # def __getattribute__(self, __name: str) -> Any:
-    #     print("getattribute on PersistenceCapable called! name: ", __name)
-
+    @classmethod
     def load(clz, key):
-        print("Loading entity..", key)
-        return clz
+        print("Class Loading..", key)
+        return PersistenceCapable.__new__(clz)
 
-    def save(clz):
-        print("Saving entity..")
-        return clz
+    @classmethod
+    def findAll(clz) -> list:
+        print("Loading all..")
 
-    def delete(clz):
-        print("Deleting entity..")
+    @classmethod
+    def find(clz, filter):
+        print("Filtered loading..")
 
 
-def infer_sqltype_from_python(t: type = None):
+def _infer_sqltype_from_python(t: type = None):
     if t is None:
         raise InvalidConfigurationWarning(
             "Tried to infer SQL type from Python return value, but None type given.")
@@ -261,7 +286,7 @@ def Column(col_name: str = None, sql_type: ColumnTypes = None):
                     "To-be-registered member did not belong to the same class (parsing).")
 
         # If PersistenceCapable could not find table_name parameter, the name of the class is supposed to be the table
-        if _class_parsing_tray["table_name"] is False:
+        if "table_name" in _class_parsing_tray:
             _class_parsing_tray['table_name'] = class_name
 
         # Everything ok with class and function, now check decorator args: If not given, try to infer from function name
@@ -273,7 +298,7 @@ def Column(col_name: str = None, sql_type: ColumnTypes = None):
             try:
                 ret_val = self.__annotations__[
                     'return']  # maybe empty -> exception
-                sql_type = infer_sqltype_from_python(
+                sql_type = _infer_sqltype_from_python(
                     ret_val)  # raises exception
             except Exception as ex:
                 raise InvalidConfigurationWarning("@Column decorator has no sql_type specified, and none return \
