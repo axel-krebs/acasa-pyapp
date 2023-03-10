@@ -5,18 +5,18 @@ from db import *
 # 'Domain objects'
 
 
-# "table_name" MUST be a keyword-based parameter, otherwise the "normal" ctor of the class will not be working!s
+# "table_name" MUST be a keyword-based parameter, otherwise the "normal" ctor of the domain class would not be working!
 @PersistenceCapable(table_name="categories")
 class Category():
 
-    @Column(col_name="id", sql_type=ColumnTypes.INTEGER)
+    @Column(col_name="id", sql_type=ColumnTypes.INTEGER, primary_key=True)
     def id() -> int:
         return 0  # "0" will be the default value
 
     @Column(col_name="name", sql_type=ColumnTypes.TEXT)
     def name() -> str:  # Function name will be replaced, as well as return value type
-        print("Hallo")  # Will be discarded!
-        # return "" - implicit!
+        print("Hallo")  # Everything done here will be discarded!
+        # return "" - implicitly None
 
     # Make sure that custom class methods won't get lost when class is "decorated"..
     def custom_method(self):
@@ -27,7 +27,7 @@ class Category():
 @PersistenceCapable(table_name="products")
 class Product():
 
-    @Column() # colummn name inferred from method signature
+    @Column()  # colummn name inferred from method signature
     def id() -> int:
         return 0.0
 
@@ -45,25 +45,30 @@ class Product():
         return None
 
 
-cat2 = Category("Holla")
-cat2.name = "Drinks"
-print(cat2.name)
-cat2.name2 = "Drink$_2"  # Additional attributes allowed, though not nice..
-cat2.custom_method()
+def install_api(asgi_RT, db_instance: SQLiteInstance, ctx_cache: ContextCache):
 
-Category.findAll()
+    set_relational_persistence_manager(db_instance) # "Injection".. TODO use 'dependency-injector' F/W
 
-# I have a key, pls. load the product
-p1 = Product.load(1)
-#p1.price = 5.99
-p1.save()
+    cat2 = Category()
+    cat2.name = "Exotic"
+    cat2.id = 1001
+    print(cat2)
+    cat2.name2 = "Drink$_2"  # Additional attributes allowed, though ignored!
+    cat2.custom_method()
+    cat2.save()
 
-pizza_margerita = Product("Pizza Margerita")
-pizza_margerita.price = 4.99
-pizza_margerita.save()
+    pizzaCat = Category.load([2000])
+    pizzaCat.name = "Pizzen"
+    pizzaCat.save()
 
+    # I have a key, pls. load the product no. 1
+    #p1 = Product.load(1)
+    #p1.price = 5.99
+    #p1.save()
 
-def install_api(asgi_RT, db_instance: DbInstance, ctx_cache: ContextCache):
+    #pizza_margerita = Product(name="Pizza Margerita")
+    #pizza_margerita.price = 4.99
+    #pizza_margerita.save()
 
     @asgi_RT.route('/products/')
     async def list_products():
