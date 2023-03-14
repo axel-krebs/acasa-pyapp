@@ -1,10 +1,10 @@
+# A website using Quart
 # Shared web objects
 from abc import ABC, abstractmethod
 import importlib
 import os
 from pathlib import Path
 from quart import Quart, session, render_template, request
-import random
 import yaml
 
 SCRIPT_PATH = Path(__name__).parent.resolve()
@@ -70,7 +70,7 @@ class WebStore(ABC):
     def create_user(self, name: str = "", email: str = ""):
         raise NotImplementedError("Should not happen..")
 
-def create_instance(root: Path = SCRIPT_PATH, doc_store: WebStore = None, global_cache: ContextCache = None) -> Quart:
+def init(config: dict = None, **externals) -> Quart:
     """
         A deployment must have a predefined structure, e.g. the config file must be named 'config.yaml' and must have an
         entry 'quart' etc.
@@ -85,6 +85,11 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: WebStore = None, global
     Returns:
         Quart: An ASGI runtime object to be deployed on a ASGI-compatible server, e.g. uvicorn. 
     """
+    doc_store: WebStore = externals["user_database"]
+    global_cache: ContextCache = externals["global_cache"]
+    
+    if config == None:
+        raise RuntimeError("The 'config' parameter must not be None!")
     if doc_store is None:
         raise RuntimeError("The document store must not be None!")
     elif not doc_store.is_prepared():
@@ -95,14 +100,7 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: WebStore = None, global
     if global_cache is None:
         global_cache = ContextCache()
 
-    CONFIG_PATH = "{}{}{}".format(root.resolve(), os.sep, "config.yml")
-    config = DEFAULT_CONFIG # !!!
-    with open(CONFIG_PATH, mode = "r", encoding = "UTF-8") as openfile:
-        cfg_text = openfile.read()
-        config = yaml.safe_load(cfg_text)
-        quart_config = config["quart"]
-        # TODO test config values..
-        config = quart_config
+    root = config[""]
     root_resolved = root.resolve()
     template_path = "{}{}{}".format(root_resolved, str(os.sep), config["template_folder"]) # need abs. path for jinja2
     static_path = "{}{}{}".format(root_resolved, str(os.sep), config["static_folder"]) # 
@@ -118,10 +116,7 @@ def create_instance(root: Path = SCRIPT_PATH, doc_store: WebStore = None, global
     
     _apply_configuration(web_app, config, doc_store)
 
-    # TODO this is just an intermediate solution: __init__.py cannot implement an I/F!
-    root_package = os.path.basename(os.path.normpath(root_resolved))
-    rp = importlib.import_module(root_package)
-    site_map = rp.apply_routes(web_app, render_template, global_cache)
+    site_map = _apply_routes(web_app, render_template, global_cache)
 
     return web_app
 
@@ -133,8 +128,40 @@ def _apply_configuration(web_app, config, app_store):
     def check_cookie():
         print("Req-Headers:", request.access_control_request_headers)
 
-# everything executed when module is imported (initialization)
+site_map = {
+    "Menue": {"url": "/menue", "template": "menue.html", "methods": ["GET"]},
+    "My Acasa": {"url": "/settings", "template": "settings.html", "methods": ["GET"]}
+}
+
+def _apply_routes(asgi_RT, render_func, ctx_cache):
+    """
+        Function signature must be exactly like this or els will not be invoked.
+        Comp. to 'init' functions in other environments..
+    Args:
+        asgi_RT (_type_): An ASGI runtime that provides a 'route' function
+        render_func (_type_): A function capable to render a template.
+        ctx_cache (_type_): An object that is passed to the template renderer.
+
+    Returns:
+        _type_: _description_
+    """
+    @asgi_RT.route('/', methods=['GET', 'POST', 'PUT'])
+    async def index():
+        return await render_func(["index.html"], site_map=site_map) 
+    
+    menue = site_map["Menue"]
+    @asgi_RT.route(menue["url"], methods=menue["methods"])
+    async def menue_func():
+        return await render_func([menue["template"]], site_map=site_map, prods=ctx_cache['prods'])
+
+    settings = site_map["My Acasa"]
+    @asgi_RT.route(settings["url"], methods=settings["methods"])
+    async def settings_func():
+        return await render_func([settings["template"]], site_map=site_map, user_settings=ctx_cache['user_settings'])
+    
+    return site_map
 
 if __name__ == "__main__":
-    print("This is a library and cannot be invoked directly; pls. use 'import' from another program.")
+    print("This is a module and cannot be invoked directly.")
     # raise error?
+    

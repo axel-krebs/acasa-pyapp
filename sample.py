@@ -1,8 +1,12 @@
 # Example web mapping
+from dependency_injector import containers, providers
+from dependency_injector.wiring import Provide, inject
 from web import ContextCache
 from db import *
 
-# 'Domain objects'
+class Application(containers.DeclarativeContainer):
+    
+    config = providers.Configuration()
 
 
 # "table_name" MUST be a keyword-based parameter, otherwise the "normal" ctor of the domain class would not be working!
@@ -57,7 +61,7 @@ def install_api(asgi_RT, db_instance: SQLiteInstance, ctx_cache: ContextCache):
     cat2.custom_method()
     cat2.save()
 
-    pizzaCat = Category.load([2000])
+    pizzaCat = Category.load(id=2000)
     pizzaCat.name = "Pizzen"
     pizzaCat.save()
 

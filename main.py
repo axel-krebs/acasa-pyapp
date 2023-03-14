@@ -195,8 +195,8 @@ def init_cache(global_cache: dict, db_inst):
     global_cache['user_settings'] = {} # hmm...
 
 def create_web_server():
-    from web import create_instance, Documentstore, ContextCache
-    class AcasaWebStore(Documentstore): # class on-the-fly.. respect I/F!
+    from web import create_instance, WebStore, ContextCache
+    class AcasaWebStore(WebStore): # class on-the-fly.. respect I/F!
 
         def __init__(self, acasa_db: ArangoClient, needs_initialization: bool):
                 self._db = acasa_db
@@ -290,13 +290,14 @@ def menu():
         elif user_choice == "dba":
             start_db_admin(config["csv_files"])
         elif user_choice == "web":
-            import sample
-            web_app, ctx_cache = create_web_server()
+            print("Sorry, under construction!")
+            #import sample
+            #web_app, ctx_cache = create_web_server()
             # deployment must come before starting the Quart instance!!
-            sample.install_api(web_app, db_proxy, ctx_cache)
+            #sample.install_api(web_app, db_proxy, ctx_cache)
             # Running the ASGI runtime with uvicorn (should be similar to deploament on Heroku etc.)
-            runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
-            print("Running {}".format(runner))
+            #runner = uvicorn.run(web_app, host="localhost", port=5000, log_level="info")
+            #print("Running {}".format(runner))
         elif user_choice == "gui":
             print("Opening admin GUI") # TODO log
             start_admin_app()

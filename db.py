@@ -1,6 +1,7 @@
 # Provide DB access for SQLite3 embedded database.
 from abc import *
 from collections import namedtuple
+import copy
 from enum import Enum
 from pathlib import Path
 from inspect import *
@@ -103,21 +104,16 @@ class MissingImplementationError(TypeError):
         super().__init__(*args)
 
 
-# miniimal class to hold column name & value
-_ColumnValue = namedtuple('_ColumnValue', ['col_name', 'col_value'])
-
-
 # Attentiona: 'a_dict' has to be a flat map!
-def extract_key_columns(a_dict: dict, keys_list: list):
-    normal_cols = []
-    key_cols = []
+def split_key_columns(a_dict: dict, keys_list: list):
+    normal_cols = {}
+    key_cols = {}
     for col_key in a_dict:
-        cv = _ColumnValue(col_key, a_dict[col_key])
         if col_key in keys_list:
-            key_cols.append(cv)
+            key_cols[col_key] = a_dict[col_key]
         else:
-            normal_cols.append(cv)
-    return normal_cols, key_cols  # Mutable!
+            normal_cols[col_key] = a_dict[col_key]
+    return normal_cols, key_cols 
 
 # Design: This 'dataobject' could as well have been coded into the PersistenceCapable class; however, thus I introduced
 # an indirection that 'maps' the class object to 'lower' data structures and succinctly decouples the object model from
@@ -135,17 +131,17 @@ class DataObject():
         InvalidMappingException: Parameter for ctor are not valid (several causes)
             """
 
-    def __init__(self, entity_name=None, col_values: dict = None, primary_keys: list = None) -> None:
+    def __init__(self, entity_name=None, columns: dict = None, primary_keys: set = None) -> None:
         if not entity_name:
             raise InvalidMappingException("Name for a table must be given.")
-        if not col_values:
+        if not columns:
             raise InvalidMappingException("No columns defined.")
         if not primary_keys:
             raise InvalidMappingException(
                 "DataObjects must have at least one primary key defined.")
 
         # distinguish between "normal" attributes and primary keys
-        columns, key_columns = extract_key_columns(col_values, primary_keys)
+        columns, key_columns = split_key_columns(columns, primary_keys)
 
         self._entity_name = entity_name
         self._columns = columns
@@ -155,37 +151,16 @@ class DataObject():
         return self._entity_name
 
     def key_columns(self):
-        """'Public' getter for the key columns property. 
-
-        Returns:
-            _type_: A list of _ColumnValue objects, s. def. 
-        """
         return self._primary_keys
+    
+    def columns(self):
+        return self._columns
 
-    # The reverse of whats been done in ctor with 'col_values'
+    # The reverse of what's been done in ctor with 'col_values', s. "split_key_columns()""
     def merge_columns(self) -> dict:
-        merged = self._columns + self._primary_keys
-        return dict(merged)
-
-    def as_paired_lists(self):  # convenience method for SQL generation
-        column_names = []
-        column_values = []
-        all_attributes = [*self._columns, *self._primary_keys]
-        for col_name, col_value in all_attributes:
-            column_names.append(col_name)
-            column_values.append(col_value)
-        return column_names, column_values
-
-    def update_pk(self, new_keys: dict = None):
-        for key_col in self._primary_keys:
-            current_colname = key_col[0]
-            if current_colname in new_keys:
-                key_col = _ColumnValue(
-                    current_colname, new_keys[current_colname])
-
-# @singleton
-
-
+        return {**self._columns, **self._primary_keys}
+                
+                
 class _ObjectStore(ABC):
 
     @abstractmethod
@@ -246,46 +221,53 @@ class SQLiteInstance(_ObjectStore):
                 return SQLCode(sql_ex)
 
     def create(self, data_object: DataObject):
-        col_name_list, col_value_list = data_object.as_paired_lists()
+        all_col_dict = data_object.merge_columns()
         _res_sql = "INSERT INTO {} (".format(data_object.table_name())
-        _res_sql += ",".join(col_name_list)
+        _res_sql += ",".join(all_col_dict.keys())
         _res_sql += ") VALUES ("
         _res_sql += ",".join(['\'{}\''.format(val)  # simple string conversion
-                             for val in col_value_list])
+                             for val in all_col_dict.values()])
         _res_sql += ");"
         conn = sqlite3.connect(self._db_file_path)
         with self._TransactionalDbAccessor(conn) as cur:
             try:
                 cur.execute(_res_sql)
-                pk = cur.lastrowid
-                pk_dict = {}
-                for key_col in data_object.key_columns():
-                    pk_dict[key_col] = pk
-                data_object.update_pk(pk_dict)
-                return data_object
+                pk = cur.lastrowid 
+                # Imagine: You put 0 as key in your object, but 1001 is returned as answer from the database! 
+                key_col_dict = data_object.key_columns()
+                for key_col in key_col_dict:
+                    key_col_dict[key_col] = pk
+                #return data_object not necessary
             except sqlite3.DatabaseError as sql_ex:
                 return SQLCode(sql_ex)
 
     def read(self, data_object: DataObject):
-        col_name_list, col_value_list = data_object.as_paired_lists()
+        col_value_dict = data_object.columns()
+        key_col_dict = data_object.key_columns()
+        col_names = []
+        for col_value in col_value_dict: # order matters!
+            col_names.append(col_value)
         _res_sql = "SELECT "
-        _res_sql += ",".join(col_name_list)
+        _res_sql += ",".join(col_names) 
         _res_sql += " FROM {}".format(data_object.table_name())
         _res_sql += " WHERE "
-        key_columns = data_object.key_columns()
-        _cnt = len(key_columns)
-        for col_name, col_value in data_object.key_columns():
-            _res_sql += col_name + "=" + col_value
+        _cnt = len(key_col_dict)
+        for col_name, col_value in key_col_dict:
+            # using implicit conversion of SQLite (TODO)
+            _res_sql += col_name + "=" + str(col_value)
             _cnt -= 1
             if _cnt > 0:
                 _res_sql += " AND "
-
         conn = sqlite3.connect(self._db_file_path)
         with self._TransactionalDbAccessor(conn) as cur:
             try:
-                res = cur.execute(_res_sql)
-                # TODO set values
-                return data_object
+                cur.execute(_res_sql)
+                res = cur.fetchone()
+                _cnt = 0
+                for col_name in col_names:
+                    data_object.set_value(col_name, res[_cnt])
+                    _cnt += 1
+                # return data_object unnecessary
             except sqlite3.DatabaseError as sql_ex:
                 return SQLCode(sql_ex)
 
@@ -379,16 +361,37 @@ class SQLiteInstance(_ObjectStore):
             self._conn.commit()
 
 
+# Wrapper for AQL (Arango Query Language)
+class AQLInstance(_ObjectStore):
+
+    def __init__(self, aql_client) -> None:
+        super().__init__()
+        self._client = aql_client
+
+
+# wrapper for CQL (Cassandra Query Language)
+class CQLInstance(_ObjectStore):
+    pass
+
+# Wrapper for Cypher language (Neo4J)
+class CypherInstance(_ObjectStore):
+    pass
+
+class MDXInstance(_ObjectStore):
+    pass
+
+class SPARQLInstance(_ObjectStore):
+    pass
 class _PersistenceCapable():
     """Interface; do not subclass!
     """
 
     @abstractmethod
-    def save():
+    def save(self):
         raise "Should never be invoked directly (abstract)!"
 
     @abstractmethod
-    def delete():
+    def delete(self):
         raise "Should never be invoked directly (abstract)!"
 
 
@@ -402,11 +405,16 @@ class _PersistenceManager(ABC):
     def persist(self, pc: _PersistenceCapable):
         raise "This is the abtract method - programming error!"
 
-
-def _check_persistence_capable(pc):
-    if not isinstance(pc, _PersistenceCapable):
-        raise TypeCastError("Submitted class not _PersistenceCapable.")
-
+# check the first (unkeyed) param for its type (class)
+def check_pc_param(clazz: type):
+        def wrapper(manager, func):
+            def check(args):
+                if isinstance(args[1], clazz):
+                    return func(args[1])
+                else:
+                    raise TypeCastError("Submitted class not _PersistenceCapable.")
+            return check
+        return wrapper
 
 class RelationalPersistenceManager(_PersistenceManager):
     """Obtain a manager for PersistenceCapable objects
@@ -416,16 +424,16 @@ class RelationalPersistenceManager(_PersistenceManager):
         self._db_proxy = db_instance
 
     # SELECT single
-    def load(self, _pc: _PersistenceCapable, keys: list):
-        _check_persistence_capable(_pc)
+    @check_pc_param(_PersistenceCapable)
+    def load(self, _pc: _PersistenceCapable):
         _do = _data_object(_pc)
         self._db_proxy.read(_do)
         _update_internal(_pc, _do)
         return _pc  # !
 
     # INSERT/UPDATE
+    @check_pc_param(_PersistenceCapable)
     def persist(self, _pc: _PersistenceCapable):
-        _check_persistence_capable(_pc)
         _do = _data_object(_pc)
         res = self._db_proxy.create(_do)
         if isinstance(res, SQLCode):
@@ -435,10 +443,14 @@ class RelationalPersistenceManager(_PersistenceManager):
             _update_internal(_pc, _do)
         return _pc  # !
 
+    @check_pc_param(_PersistenceCapable)
     def delete(self, _pc: _PersistenceCapable):
-        _check_persistence_capable(_pc)
+
         return _pc
 
+
+class ObjectPersistenceManager(_PersistenceManager):
+    pass
 
 # The registry;
 # Format: {
@@ -558,7 +570,7 @@ class PersistenceCapable(_PersistenceCapable):
     """
 
     # Evaluate decorator arguments; self = PersistenceCapable; attention: since __call__ on ctor returns the mixin; this
-    # will be also invoked when an object of the original class is created!
+    # will also be invoked when an object of the original class is created! Initialization of 'instance' attributes
     def __init__(self, *ctor_args, **kwargs):
         # super().__init__(**kwargs) no.
         if ctor_args:
@@ -569,7 +581,7 @@ class PersistenceCapable(_PersistenceCapable):
             if "table_name" in kwargs:
                 table_name = kwargs["table_name"]
 
-                # now, somebody may erraneously calls the ctor with 'table_name' parameter again (after parsing)
+                # now, somebody may erranously call the ctor with 'table_name' parameter again (after parsing)
                 self_clz = self.__class__
                 if self_clz in pcc_registry.values():
                     raise ImproperUsageException(
@@ -578,16 +590,19 @@ class PersistenceCapable(_PersistenceCapable):
                 _class_parsing_tray['table_name'] = table_name
                 _class_parsing_tray['table_columns'] = []
                 _class_parsing_tray['table_joins'] = []
-            else:
-                print("TODO: set named parameters as attributes")
-        else:  # Empty ctor on domain object invoked OR table_name not provided! Idle FTTB
-            print(
-                "Empty ctor on domain object invoked OR table_name not provided! Idle FTTB")
 
-    # Decorated class instantiation (import time); Attention: called last after Column, Join etc. have been called..
-    # Therefore, only checks should be made here that everything went right during registration and decorated members
-    # have been registered orderly. Ctor invocation of original domain class must not be paid attention to.
+            else:  # ctor invoked with key-value pairs (not import-time), e.g. in load() class method
+                the_map = self.__class__.__dict__["_value_map_template"].copy()
+                self._value_map = the_map
+                for attr in kwargs:
+                    setattr(self, attr, kwargs[attr])
 
+        # Empty ctor on domain object invoked [OR table_name not provided! Idle FTTB]
+        else:
+            self._value_map = self.__class__.__dict__["_value_map_template"].copy()
+
+    # Decorated class instantiation (import time); Attention: called last after @Column, @Join etc. have been called..
+    # Therefore, only checks should be made here that everything went right during registration of the decorated members
     def __call__(self, *args):  # self = PersistenceCapable!
 
         if args is None or len(args) == 0:
@@ -621,7 +636,7 @@ class PersistenceCapable(_PersistenceCapable):
                     clz_base = clz.__base__
 
                     # No! Assume NO INHERITANCE for PersistenceCapable; maybe later..
-                    clz_base_name = clz_base.__name__
+                    #clz_base_name = clz_base.__name__
 
                     # Extend type with THIS as a mixin; this could be done prior to eval parsing_tray, however, thus the
                     # operation is omitted if configuration error exist.
@@ -632,14 +647,12 @@ class PersistenceCapable(_PersistenceCapable):
                         raise ImproperUsageException(
                             "PersistenceCapable-decorated classes may not inherit (s. Release)", typEx)
 
-                    # save() and delete() are instance methods: These fcts. get bound to THIS. Actually, these functions
-                    # will eval the _value_map and _table_name attributes that have just been set on the instance..
-                    setattr(clz, "save", save)
-                    setattr(clz, "delete", delete)
+                    # class properties ('static')
+                    clz._table_name = _class_parsing_tray["table_name"]
 
                     # initialize columns map and attach getter-setter methods
                     value_map = {}
-                    primary_keys = []  # maybe compound!
+                    primary_keys = []  # static -> convert to immutable; maybe compound!
 
                     for col_def in _class_parsing_tray["table_columns"]:
 
@@ -654,13 +667,16 @@ class PersistenceCapable(_PersistenceCapable):
                         if col_def["primary_key"]:
                             primary_keys.append(col_name)
 
-                        # Provide a "Getter" and "Setter" for the values as instance "properties" (members)
-                        setattr(self, col_def["class_prop"],
+                        # Provide a "Getter" and "Setter" for the values as instance "properties" of PersistenceCapable?
+                        setattr(clz, col_def["class_prop"],
                                 _GetterSetter(col_name))
 
-                    self._table_name = _class_parsing_tray["table_name"]
-                    self._value_map = value_map  # attach to instance
-                    self._primary_keys = primary_keys
+                    clz._primary_keys = {*primary_keys}  # set!
+                    clz._value_map_template = value_map  # TB attached to instance!!
+
+                    # save() and delete() are instance methods! These fcts. get bound to THIS.
+                    setattr(clz, "save", save)
+                    setattr(clz, "delete", delete)
 
                     # Register parsing results
                     pcc_registry[clz_qname] = clz
@@ -690,14 +706,19 @@ class PersistenceCapable(_PersistenceCapable):
         return str_repr
 
     @classmethod
-    def load(clz, keys) -> _PersistenceCapable:
-        # global persistence_manager
+    # Attention: clz is NOT a PersistenceCapable here (classmethod!); this class method was just added for convenience!!
+    def load(clz, **kw_keys) -> _PersistenceCapable:
+
         if persistence_manager is None:
             print(
                 "persistence_manager was None, pls. set with set_persistence_manager(db: DbInstance)")
             return clz
         else:
-            clz_inst = persistence_manager.load(clz, keys=keys)
+            # Instead of working all through a __new__ ctor, we just copy the registered class here.
+            #clz_qname = clz.__module__ + "." + clz.__name__
+            #clz_inst = copy.deepcopy(pcc_registry[clz_qname])
+            clz_inst = clz(**kw_keys)
+            persistence_manager.load(clz_inst)
             return clz_inst
 
     @classmethod
@@ -830,6 +851,10 @@ class UnitTestSQLite(unittest.TestCase):
             def fancy(): pass  # must not be 'swallowed'!
 
         sr = SimpleRelation()
+
+        def w_e():
+            return "I-C-H"
+        sr.whatever = w_e
         assert hasattr(sr, 'load')
         assert hasattr(sr, 'save')
         assert hasattr(sr, 'delete')
@@ -837,6 +862,11 @@ class UnitTestSQLite(unittest.TestCase):
         assert hasattr(sr, 'findAll')
         assert hasattr(sr, 'id')
         assert hasattr(sr, 'fancy')
+        assert hasattr(sr, 'whatever')
+        assert sr.whatever() == "I-C-H"
+        # check _SetterGetter working on instance
+        sr.id = 1001
+        assert sr.id == 1001
 
     def test_PersistentWithoutColumn(self):
         with self.assertRaises(Exception) as context:
